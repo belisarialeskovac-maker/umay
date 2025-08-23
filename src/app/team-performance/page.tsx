@@ -153,7 +153,7 @@ export default function TeamPerformancePage() {
     const performanceData = agents.map(agent => {
         const agentDailyAdded = dailyAddedClients.filter(c => c.assignedAgent === agent.name && isToday(c.date)).length;
         const agentMonthlyAdded = dailyAddedClients.filter(c => c.assignedAgent === agent.name && isThisMonth(c.date)).length;
-        const agentOpenAccounts = clients.filter(c => c.agent === agent.name).length;
+        const agentOpenAccounts = clients.filter(c => c.agent === agent.name && isThisMonth(c.kycCompletedDate)).length;
         const agentDeposits = deposits.filter(d => d.agent === agent.name && isThisMonth(d.date)).reduce((sum, d) => sum + d.amount, 0);
         const agentWithdrawals = withdrawals.filter(w => w.agent === agent.name && isThisMonth(w.date)).reduce((sum, w) => sum + w.amount, 0);
         
