@@ -38,7 +38,7 @@ const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/videocall-template', icon: Video, label: 'Videocall Template' },
   { href: '/client-details', icon: Users, label: 'Client Details' },
-  { href: '#', icon: ClipboardList, label: 'Order Request' },
+  { href: '/order-request', icon: ClipboardList, label: 'Order Request' },
   { href: '/deposit', icon: ArrowDownToLine, label: 'Deposit' },
   { href: '/withdrawal', icon: ArrowUpFromLine, label: 'Withdrawal' },
   { href: '/team-performance', icon: AreaChart, label: 'Team Performance' },
