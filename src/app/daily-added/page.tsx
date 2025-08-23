@@ -5,8 +5,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format, isToday, isThisMonth, startOfToday } from 'date-fns';
-import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays } from 'lucide-react';
+import { format, isToday, isThisMonth } from 'date-fns';
+import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -35,6 +35,17 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 const agentSchema = z.object({
   name: z.string(),
@@ -192,10 +203,8 @@ export default function DailyAddedPage() {
           date: new Date(),
         };
 
-        // Add to session clients for immediate display
         setSessionClients((prevClients) => [...prevClients, newClient]);
         
-        // Add to persistent storage
         const allDailyClients = JSON.parse(localStorage.getItem('dailyAddedClients') || '[]');
         allDailyClients.push(newClient);
         localStorage.setItem('dailyAddedClients', JSON.stringify(allDailyClients));
@@ -208,7 +217,6 @@ export default function DailyAddedPage() {
         form.reset({ assignedAgent: "" });
         setPastedDetails('');
         
-        // Recalculate stats after adding a new client
         calculateStats();
 
     } catch (error: any) {
@@ -220,6 +228,16 @@ export default function DailyAddedPage() {
     }
   }
 
+  const handleClearData = () => {
+    localStorage.removeItem('dailyAddedClients');
+    setSessionClients([]);
+    calculateStats();
+    toast({
+        title: "Data Cleared",
+        description: "All daily added client data has been cleared."
+    })
+  }
+
   return (
     <div className="w-full h-full">
       <div className="flex justify-between items-center mb-6">
@@ -229,6 +247,25 @@ export default function DailyAddedPage() {
             Track and manage daily client entries and statistics.
           </p>
         </div>
+         <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button variant="destructive">
+                    <Trash2 className="mr-2 h-4 w-4" /> Clear All Data
+                </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete all daily added client data from your browser's storage.
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleClearData}>Continue</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
       </div>
       
       <div className="space-y-8">
@@ -368,7 +405,7 @@ export default function DailyAddedPage() {
                 <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm min-h-[30vh]">
                 <div className="text-center">
                     <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                    No Clients Added Today
+                    No Clients Added This Session
                     </h2>
                     <p className="text-muted-foreground mt-2">
                     Clients added in this session will appear here.
