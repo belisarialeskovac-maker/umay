@@ -30,6 +30,7 @@ const formSchema = z.object({
   model: z.string().min(1, "Model is required."),
   color: z.string().min(1, "Color is required."),
   appleIdUsername: z.string().optional(),
+  appleIdPassword: z.string().optional(),
   remarks: z.string().optional(),
 })
 
@@ -47,6 +48,7 @@ export default function AddDeviceForm({ onSubmit, agentNames }: AddDeviceFormPro
       model: "",
       color: "",
       appleIdUsername: "",
+      appleIdPassword: "",
       remarks: "",
     },
   })
@@ -138,11 +140,24 @@ export default function AddDeviceForm({ onSubmit, agentNames }: AddDeviceFormPro
               </FormItem>
             )}
           />
+          <FormField
+            control={form.control}
+            name="appleIdPassword"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Apple ID Password (Optional)</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="Enter Apple ID Password" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
            <FormField
             control={form.control}
             name="remarks"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="md:col-span-2">
                 <FormLabel>Remarks (Optional)</FormLabel>
                 <FormControl>
                   <Textarea placeholder="Any additional remarks..." {...field} />

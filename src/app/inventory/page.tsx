@@ -18,6 +18,7 @@ export type DeviceInventory = {
   model: string
   color: string
   appleIdUsername?: string
+  appleIdPassword?: string
   remarks?: string
   createdAt: string
   updatedAt: string
@@ -90,6 +91,7 @@ export default function InventoryPage() {
           device.model.toLowerCase().includes(term) ||
           device.color.toLowerCase().includes(term) ||
           (device.appleIdUsername && device.appleIdUsername.toLowerCase().includes(term)) ||
+          (device.appleIdPassword && device.appleIdPassword.toLowerCase().includes(term)) ||
           (device.remarks && device.remarks.toLowerCase().includes(term))
         )
       })

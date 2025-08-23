@@ -64,6 +64,7 @@ const editFormSchema = z.object({
   model: z.string().min(1, "Model is required."),
   color: z.string().min(1, "Color is required."),
   appleIdUsername: z.string().optional(),
+  appleIdPassword: z.string().optional(),
   remarks: z.string().optional(),
 })
 
@@ -90,6 +91,7 @@ export default function InventoryTable({
       model: device.model,
       color: device.color,
       appleIdUsername: device.appleIdUsername || "",
+      appleIdPassword: device.appleIdPassword || "",
       remarks: device.remarks || "",
     })
   }
@@ -127,6 +129,7 @@ export default function InventoryTable({
               <TableHead>Model</TableHead>
               <TableHead>Color</TableHead>
               <TableHead>Apple ID</TableHead>
+              <TableHead>Apple ID Password</TableHead>
               <TableHead>Remarks</TableHead>
               <TableHead>Last Updated</TableHead>
               <TableHead>
@@ -143,6 +146,7 @@ export default function InventoryTable({
                   <TableCell>{device.model}</TableCell>
                   <TableCell>{device.color}</TableCell>
                   <TableCell>{device.appleIdUsername || "N/A"}</TableCell>
+                  <TableCell>{device.appleIdPassword || "N/A"}</TableCell>
                   <TableCell>{device.remarks || "N/A"}</TableCell>
                   <TableCell>{format(new Date(device.updatedAt), "PPP p")}</TableCell>
                   <TableCell>
@@ -174,7 +178,7 @@ export default function InventoryTable({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
+                <TableCell colSpan={9} className="h-24 text-center">
                   No results found.
                 </TableCell>
               </TableRow>
@@ -185,7 +189,7 @@ export default function InventoryTable({
 
       {/* Edit Dialog */}
       <Dialog open={!!editingDevice} onOpenChange={(open) => !open && setEditingDevice(null)}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Device</DialogTitle>
             <DialogDescription>
@@ -194,95 +198,110 @@ export default function InventoryTable({
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleUpdateSubmit)} className="space-y-4 py-4">
-               <FormField
-                    control={form.control}
-                    name="agent"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Agent</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                            <SelectTrigger>
-                            <SelectValue placeholder="Select an agent" />
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            {agentNames.map((name) => (
-                            <SelectItem key={name} value={name}>
-                                {name}
-                            </SelectItem>
-                            ))}
-                        </SelectContent>
-                        </Select>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
-                    control={form.control}
-                    name="imei"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>IMEI</FormLabel>
-                        <FormControl>
-                        <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="model"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Model</FormLabel>
-                        <FormControl>
-                        <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="color"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Color</FormLabel>
-                        <FormControl>
-                        <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="appleIdUsername"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Apple ID Username</FormLabel>
-                        <FormControl>
-                        <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="remarks"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Remarks</FormLabel>
-                        <FormControl>
-                        <Textarea {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
+                      control={form.control}
+                      name="agent"
+                      render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Agent</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                              <SelectTrigger>
+                              <SelectValue placeholder="Select an agent" />
+                              </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                              {agentNames.map((name) => (
+                              <SelectItem key={name} value={name}>
+                                  {name}
+                              </SelectItem>
+                              ))}
+                          </SelectContent>
+                          </Select>
+                          <FormMessage />
+                      </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="imei"
+                      render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>IMEI</FormLabel>
+                          <FormControl>
+                          <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="model"
+                      render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Model</FormLabel>
+                          <FormControl>
+                          <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="color"
+                      render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Color</FormLabel>
+                          <FormControl>
+                          <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="appleIdUsername"
+                      render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Apple ID Username</FormLabel>
+                          <FormControl>
+                          <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="appleIdPassword"
+                      render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Apple ID Password</FormLabel>
+                          <FormControl>
+                          <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="remarks"
+                      render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                          <FormLabel>Remarks</FormLabel>
+                          <FormControl>
+                          <Textarea {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                      )}
+                  />
+              </div>
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setEditingDevice(null)}>Cancel</Button>
                 <Button type="submit">Save changes</Button>
