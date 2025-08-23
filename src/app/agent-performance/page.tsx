@@ -105,6 +105,23 @@ type Order = {
     remarks: string;
     status: "Pending" | "Approved" | "Rejected";
 }
+type Absence = {
+  date: Date;
+  agent: string;
+  remarks: string;
+}
+type Penalty = {
+  date: Date;
+  agent: string;
+  remarks: string;
+  amount: number;
+}
+type Reward = {
+  date: Date;
+  agent: string;
+  remarks: string;
+  status: "Claimed" | "Unclaimed"
+}
 
 
 export default function AgentPerformancePage() {
@@ -120,6 +137,9 @@ export default function AgentPerformancePage() {
   const [agentWithdrawals, setAgentWithdrawals] = useState<Transaction[]>([]);
   const [agentInventory, setAgentInventory] = useState<Inventory[]>([]);
   const [agentOrders, setAgentOrders] = useState<Order[]>([]);
+  const [agentAbsences, setAgentAbsences] = useState<Absence[]>([]);
+  const [agentPenalties, setAgentPenalties] = useState<Penalty[]>([]);
+  const [agentRewards, setAgentRewards] = useState<Reward[]>([]);
 
 
   const form = useForm<Agent>({
@@ -149,12 +169,18 @@ export default function AgentPerformancePage() {
         const allWithdrawals: Transaction[] = JSON.parse(localStorage.getItem('withdrawals') || '[]').map((w:any) => ({...w, date: new Date(w.date)}));
         const allInventory: Inventory[] = JSON.parse(localStorage.getItem('inventory') || '[]');
         const allOrders: Order[] = JSON.parse(localStorage.getItem('orders') || '[]');
+        const allAbsences: Absence[] = JSON.parse(localStorage.getItem('absences') || '[]').map((a:any) => ({...a, date: new Date(a.date)}));
+        const allPenalties: Penalty[] = JSON.parse(localStorage.getItem('penalties') || '[]').map((p:any) => ({...p, date: new Date(p.date)}));
+        const allRewards: Reward[] = JSON.parse(localStorage.getItem('rewards') || '[]').map((r:any) => ({...r, date: new Date(r.date)}));
 
         setAgentClients(allClients.filter(c => c.agent === selectedAgent.name));
         setAgentDeposits(allDeposits.filter(d => d.agent === selectedAgent.name));
         setAgentWithdrawals(allWithdrawals.filter(w => w.agent === selectedAgent.name));
         setAgentInventory(allInventory.filter(i => i.agent === selectedAgent.name));
         setAgentOrders(allOrders.filter(o => o.agent === selectedAgent.name));
+        setAgentAbsences(allAbsences.filter(a => a.agent === selectedAgent.name));
+        setAgentPenalties(allPenalties.filter(p => p.agent === selectedAgent.name));
+        setAgentRewards(allRewards.filter(r => r.agent === selectedAgent.name));
     }
   }, [selectedAgent]);
 
@@ -316,12 +342,14 @@ export default function AgentPerformancePage() {
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="overview">
-                    <TabsList>
+                    <TabsList className="grid w-full grid-cols-7">
                         <TabsTrigger value="overview">Overview</TabsTrigger>
                         <TabsTrigger value="clients">Clients</TabsTrigger>
                         <TabsTrigger value="transactions">Transactions</TabsTrigger>
                         <TabsTrigger value="inventory">Inventory</TabsTrigger>
                         <TabsTrigger value="orders">Orders</TabsTrigger>
+                        <TabsTrigger value="discipline">Discipline</TabsTrigger>
+                        <TabsTrigger value="rewards">Rewards</TabsTrigger>
                     </TabsList>
                     <TabsContent value="overview" className="pt-4">
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -396,6 +424,42 @@ export default function AgentPerformancePage() {
                                 {agentOrders.length > 0 ? agentOrders.map(o => (
                                     <TableRow key={o.id}><TableCell>{o.shopId}</TableCell><TableCell>{o.location}</TableCell><TableCell>${o.price.toFixed(2)}</TableCell><TableCell><Badge variant={o.status === 'Approved' ? 'default' : o.status === 'Pending' ? 'secondary' : 'destructive'}>{o.status}</Badge></TableCell></TableRow>
                                 )) : <TableRow><TableCell colSpan={4} className="text-center">No orders found for this agent.</TableCell></TableRow>}
+                            </TableBody>
+                        </Table>
+                    </TabsContent>
+                    <TabsContent value="discipline">
+                        <div className="grid gap-6 md:grid-cols-2">
+                            <div>
+                                <h3 className="text-lg font-medium mb-2">Absences</h3>
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Remarks</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {agentAbsences.length > 0 ? agentAbsences.map((a,i) => (
+                                            <TableRow key={`abs-${i}`}><TableCell>{format(a.date, "PPP")}</TableCell><TableCell>{a.remarks}</TableCell></TableRow>
+                                        )) : <TableRow><TableCell colSpan={2} className="text-center">No absences found.</TableCell></TableRow>}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-medium mb-2">Penalties</h3>
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Remarks</TableHead><TableHead>Amount</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {agentPenalties.length > 0 ? agentPenalties.map((p,i) => (
+                                            <TableRow key={`pen-${i}`}><TableCell>{format(p.date, "PPP")}</TableCell><TableCell>{p.remarks}</TableCell><TableCell>${p.amount.toFixed(2)}</TableCell></TableRow>
+                                        )) : <TableRow><TableCell colSpan={3} className="text-center">No penalties found.</TableCell></TableRow>}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </div>
+                    </TabsContent>
+                    <TabsContent value="rewards">
+                        <Table>
+                            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                            <TableBody>
+                                {agentRewards.length > 0 ? agentRewards.map((r,i) => (
+                                    <TableRow key={`rew-${i}`}><TableCell>{format(r.date, "PPP")}</TableCell><TableCell>{r.remarks}</TableCell><TableCell><Badge variant={r.status === 'Claimed' ? 'secondary' : 'default'}>{r.status}</Badge></TableCell></TableRow>
+                                )) : <TableRow><TableCell colSpan={3} className="text-center">No rewards found for this agent.</TableCell></TableRow>}
                             </TableBody>
                         </Table>
                     </TabsContent>

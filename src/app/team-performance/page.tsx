@@ -139,9 +139,9 @@ export default function TeamPerformancePage() {
   
   const { toast } = useToast()
 
-  const absenceForm = useForm<Absence>({ resolver: zodResolver(absenceSchema) })
-  const penaltyForm = useForm<Penalty>({ resolver: zodResolver(penaltySchema) })
-  const rewardForm = useForm<Reward>({ resolver: zodResolver(rewardSchema) })
+  const absenceForm = useForm<Absence>({ resolver: zodResolver(absenceSchema), defaultValues: { date: new Date() } })
+  const penaltyForm = useForm<Penalty>({ resolver: zodResolver(penaltySchema), defaultValues: { date: new Date(), amount: 0 } })
+  const rewardForm = useForm<Reward>({ resolver: zodResolver(rewardSchema), defaultValues: { date: new Date(), status: "Unclaimed"} })
 
   const calculatePerformanceMetrics = useCallback((agents: Agent[]) => {
     const dailyAddedClients: DailyAddedClient[] = JSON.parse(localStorage.getItem('dailyAddedClients') || '[]').map((c: any) => ({ ...c, date: new Date(c.date) }));
@@ -174,6 +174,7 @@ export default function TeamPerformancePage() {
   }, []);
 
   useEffect(() => {
+    // Load agents
     const storedAgents = localStorage.getItem("agents");
     if (storedAgents) {
       const parsedAgents: Agent[] = JSON.parse(storedAgents).map((agent: any) => ({
@@ -183,27 +184,44 @@ export default function TeamPerformancePage() {
       setRegisteredAgents(parsedAgents);
       calculatePerformanceMetrics(parsedAgents);
     }
+    
+    // Load absences, penalties, rewards
+    const storedAbsences = localStorage.getItem("absences");
+    if(storedAbsences) setAbsences(JSON.parse(storedAbsences).map((a:any) => ({...a, date: new Date(a.date)})));
+    
+    const storedPenalties = localStorage.getItem("penalties");
+    if(storedPenalties) setPenalties(JSON.parse(storedPenalties).map((p:any) => ({...p, date: new Date(p.date)})));
+
+    const storedRewards = localStorage.getItem("rewards");
+    if(storedRewards) setRewards(JSON.parse(storedRewards).map((r:any) => ({...r, date: new Date(r.date)})));
+
   }, [calculatePerformanceMetrics]);
 
   const onAbsenceSubmit = (values: Absence) => {
-    setAbsences((prev) => [...prev, values])
+    const updatedAbsences = [...absences, values];
+    setAbsences(updatedAbsences);
+    localStorage.setItem("absences", JSON.stringify(updatedAbsences));
     toast({ title: "Absence Recorded", description: `Absence for ${values.agent} has been recorded.` })
     setAbsenceDialogOpen(false)
-    absenceForm.reset({agent: '', remarks: ''})
+    absenceForm.reset({agent: '', remarks: '', date: new Date()})
   }
 
   const onPenaltySubmit = (values: Penalty) => {
-    setPenalties((prev) => [...prev, values])
+    const updatedPenalties = [...penalties, values];
+    setPenalties(updatedPenalties);
+    localStorage.setItem("penalties", JSON.stringify(updatedPenalties));
     toast({ title: "Penalty Recorded", description: `Penalty for ${values.agent} has been recorded.` })
     setPenaltyDialogOpen(false)
-    penaltyForm.reset({agent: '', remarks: '', amount: 0})
+    penaltyForm.reset({agent: '', remarks: '', amount: 0, date: new Date()})
   }
 
   const onRewardSubmit = (values: Reward) => {
-    setRewards((prev) => [...prev, values])
+    const updatedRewards = [...rewards, values];
+    setRewards(updatedRewards);
+    localStorage.setItem("rewards", JSON.stringify(updatedRewards));
     toast({ title: "Reward Recorded", description: `Reward for ${values.agent} has been recorded.` })
     setRewardDialogOpen(false)
-    rewardForm.reset({agent: '', remarks: '', status: 'Unclaimed'})
+    rewardForm.reset({agent: '', remarks: '', status: 'Unclaimed', date: new Date()})
   }
 
   const handleEdit = (agentName: string) => {
@@ -246,15 +264,15 @@ export default function TeamPerformancePage() {
         </div>
       </div>
       <Tabs defaultValue="team">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="absences">Absences</TabsTrigger>
           <TabsTrigger value="penalties">Penalties</TabsTrigger>
           <TabsTrigger value="rewards">Rewards</TabsTrigger>
         </TabsList>
-        <TabsContent value="team">
+        <TabsContent value="team" className="mt-4">
              {teamPerformance.length > 0 ? (
-                <div className="rounded-lg border bg-card mt-4">
+                <div className="rounded-lg border bg-card">
                 <Table>
                     <TableHeader>
                     <TableRow>
@@ -274,27 +292,27 @@ export default function TeamPerformancePage() {
                             <TableCell>{item.agentName}</TableCell>
                             <TableCell>
                                 {editingAgent === item.agentName ? (
-                                    <Input type="number" value={editedData.addedToday} onChange={e => handleInputChange(e, 'addedToday')} className="w-24" />
+                                    <Input type="number" value={editedData.addedToday ?? ''} onChange={e => handleInputChange(e, 'addedToday')} className="w-24" />
                                 ) : item.addedToday}
                             </TableCell>
                              <TableCell>
                                 {editingAgent === item.agentName ? (
-                                    <Input type="number" value={editedData.monthlyAdded} onChange={e => handleInputChange(e, 'monthlyAdded')} className="w-24" />
+                                    <Input type="number" value={editedData.monthlyAdded ?? ''} onChange={e => handleInputChange(e, 'monthlyAdded')} className="w-24" />
                                 ) : item.monthlyAdded}
                             </TableCell>
                             <TableCell>
                                 {editingAgent === item.agentName ? (
-                                    <Input type="number" value={editedData.openAccounts} onChange={e => handleInputChange(e, 'openAccounts')} className="w-24" />
+                                    <Input type="number" value={editedData.openAccounts ?? ''} onChange={e => handleInputChange(e, 'openAccounts')} className="w-24" />
                                 ) : item.openAccounts}
                             </TableCell>
                             <TableCell>
                                 {editingAgent === item.agentName ? (
-                                    <Input type="number" value={editedData.totalDeposits} onChange={e => handleInputChange(e, 'totalDeposits')} className="w-32" />
+                                    <Input type="number" value={editedData.totalDeposits ?? ''} onChange={e => handleInputChange(e, 'totalDeposits')} className="w-32" />
                                 ) : `$${item.totalDeposits.toFixed(2)}`}
                             </TableCell>
                              <TableCell>
                                 {editingAgent === item.agentName ? (
-                                    <Input type="number" value={editedData.totalWithdrawals} onChange={e => handleInputChange(e, 'totalWithdrawals')} className="w-32" />
+                                    <Input type="number" value={editedData.totalWithdrawals ?? ''} onChange={e => handleInputChange(e, 'totalWithdrawals')} className="w-32" />
                                 ) : `$${item.totalWithdrawals.toFixed(2)}`}
                             </TableCell>
                             <TableCell>{item.lastEditedBy}</TableCell>
@@ -323,7 +341,7 @@ export default function TeamPerformancePage() {
             )}
         </TabsContent>
         <TabsContent value="absences">
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-end my-4">
             <Dialog open={absenceDialogOpen} onOpenChange={setAbsenceDialogOpen}>
               <DialogTrigger asChild>
                 <Button>Add Absence</Button>
@@ -383,7 +401,7 @@ export default function TeamPerformancePage() {
             </Dialog>
           </div>
           {absences.length > 0 ? (
-            <div className="rounded-lg border bg-card mt-4">
+            <div className="rounded-lg border bg-card">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -404,7 +422,7 @@ export default function TeamPerformancePage() {
               </Table>
             </div>
           ) : (
-            <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[40vh] mt-4">
+            <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[40vh]">
               <div className="text-center">
                 <h2 className="text-2xl font-bold tracking-tight text-foreground">No Absences Recorded</h2>
                 <p className="text-muted-foreground mt-2">Absence data will appear here.</p>
@@ -413,7 +431,7 @@ export default function TeamPerformancePage() {
           )}
         </TabsContent>
         <TabsContent value="penalties">
-        <div className="flex justify-end mt-4">
+        <div className="flex justify-end my-4">
             <Dialog open={penaltyDialogOpen} onOpenChange={setPenaltyDialogOpen}>
               <DialogTrigger asChild>
                 <Button>Add Penalty</Button>
@@ -482,7 +500,7 @@ export default function TeamPerformancePage() {
             </Dialog>
           </div>
         {penalties.length > 0 ? (
-            <div className="rounded-lg border bg-card mt-4">
+            <div className="rounded-lg border bg-card">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -505,7 +523,7 @@ export default function TeamPerformancePage() {
               </Table>
             </div>
           ) : (
-            <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[40vh] mt-4">
+            <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[40vh]">
               <div className="text-center">
                 <h2 className="text-2xl font-bold tracking-tight text-foreground">No Penalties Recorded</h2>
                 <p className="text-muted-foreground mt-2">Penalty data will appear here.</p>
@@ -514,7 +532,7 @@ export default function TeamPerformancePage() {
           )}
         </TabsContent>
         <TabsContent value="rewards">
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-end my-4">
             <Dialog open={rewardDialogOpen} onOpenChange={setRewardDialogOpen}>
               <DialogTrigger asChild>
                 <Button>Add Reward</Button>
@@ -587,7 +605,7 @@ export default function TeamPerformancePage() {
             </Dialog>
           </div>
         {rewards.length > 0 ? (
-            <div className="rounded-lg border bg-card mt-4">
+            <div className="rounded-lg border bg-card">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -614,7 +632,7 @@ export default function TeamPerformancePage() {
               </Table>
             </div>
           ) : (
-            <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[40vh] mt-4">
+            <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[40vh]">
               <div className="text-center">
                 <h2 className="text-2xl font-bold tracking-tight text-foreground">No Rewards Recorded</h2>
                 <p className="text-muted-foreground mt-2">Reward data will appear here.</p>
