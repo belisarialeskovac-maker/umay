@@ -36,6 +36,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 
 const agentTypes = ["Regular", "Elite", "Spammer", "Model", "Team Leader"] as const
@@ -53,11 +61,14 @@ const formSchema = z.object({
   agentType: z.enum(agentTypes),
 })
 
+type Agent = z.infer<typeof formSchema>
+
 export default function AgentPerformancePage() {
   const [open, setOpen] = useState(false)
+  const [agents, setAgents] = useState<Agent[]>([])
   const { toast } = useToast()
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<Agent>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
@@ -65,8 +76,8 @@ export default function AgentPerformancePage() {
     },
   })
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values)
+  function onSubmit(values: Agent) {
+    setAgents((prevAgents) => [...prevAgents, values])
     toast({
       title: "Agent Registered",
       description: `Successfully registered ${values.name}.`,
@@ -196,16 +207,41 @@ export default function AgentPerformancePage() {
           </DialogContent>
         </Dialog>
       </div>
-      <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] p-6">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">
-            Agent Performance Data
-          </h2>
-          <p className="text-muted-foreground mt-2">
-            Agent registrations and performance metrics will be displayed here.
-          </p>
+      {agents.length > 0 ? (
+        <div className="rounded-lg border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Date Hired</TableHead>
+                <TableHead>Agent Type</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {agents.map((agent, index) => (
+                <TableRow key={index}>
+                  <TableCell>{agent.name}</TableCell>
+                  <TableCell>{agent.email}</TableCell>
+                  <TableCell>{format(agent.dateHired, "PPP")}</TableCell>
+                  <TableCell>{agent.agentType}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] p-6">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">
+              No Agents Registered
+            </h2>
+            <p className="text-muted-foreground mt-2">
+              Register an agent to see their performance data here.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
