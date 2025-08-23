@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -55,6 +55,15 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { Textarea } from "@/components/ui/textarea"
 
+const agentSchema = z.object({
+  name: z.string(),
+  email: z.string(),
+  dateHired: z.date(),
+  agentType: z.string(),
+})
+
+type Agent = z.infer<typeof agentSchema>;
+
 const absenceSchema = z.object({
   date: z.date({ required_error: "Date is required." }),
   agent: z.string().min(1, "Agent name is required."),
@@ -83,6 +92,7 @@ export default function TeamPerformancePage() {
   const [absences, setAbsences] = useState<Absence[]>([])
   const [penalties, setPenalties] = useState<Penalty[]>([])
   const [rewards, setRewards] = useState<Reward[]>([])
+  const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([])
 
   const [absenceDialogOpen, setAbsenceDialogOpen] = useState(false)
   const [penaltyDialogOpen, setPenaltyDialogOpen] = useState(false)
@@ -93,6 +103,18 @@ export default function TeamPerformancePage() {
   const absenceForm = useForm<Absence>({ resolver: zodResolver(absenceSchema) })
   const penaltyForm = useForm<Penalty>({ resolver: zodResolver(penaltySchema) })
   const rewardForm = useForm<Reward>({ resolver: zodResolver(rewardSchema) })
+
+  useEffect(() => {
+    const storedAgents = localStorage.getItem("agents");
+    if (storedAgents) {
+      // The stored dates are strings, so we need to convert them back to Date objects
+      const parsedAgents = JSON.parse(storedAgents).map((agent: any) => ({
+        ...agent,
+        dateHired: new Date(agent.dateHired),
+      }));
+      setRegisteredAgents(parsedAgents);
+    }
+  }, []);
 
   const onAbsenceSubmit = (values: Absence) => {
     setAbsences((prev) => [...prev, values])
@@ -115,7 +137,6 @@ export default function TeamPerformancePage() {
     rewardForm.reset({agent: '', remarks: '', status: 'Unclaimed'})
   }
 
-  const registeredAgents = ["John Doe", "Jane Smith", "Peter Jones"]; // This should be fetched from your agent data
 
   return (
     <div className="w-full h-full">
@@ -151,7 +172,7 @@ export default function TeamPerformancePage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {registeredAgents.map(agent => <SelectItem key={agent} value={agent}>{agent}</SelectItem>)}
+                            {registeredAgents.map(agent => <SelectItem key={agent.name} value={agent.name}>{agent.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -241,7 +262,7 @@ export default function TeamPerformancePage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {registeredAgents.map(agent => <SelectItem key={agent} value={agent}>{agent}</SelectItem>)}
+                            {registeredAgents.map(agent => <SelectItem key={agent.name} value={agent.name}>{agent.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -342,7 +363,7 @@ export default function TeamPerformancePage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {registeredAgents.map(agent => <SelectItem key={agent} value={agent}>{agent}</SelectItem>)}
+                            {registeredAgents.map(agent => <SelectItem key={agent.name} value={agent.name}>{agent.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -437,5 +458,3 @@ export default function TeamPerformancePage() {
     </div>
   )
 }
-
-    

@@ -1,6 +1,7 @@
+
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -76,8 +77,22 @@ export default function AgentPerformancePage() {
     },
   })
 
+  useEffect(() => {
+    const storedAgents = localStorage.getItem("agents");
+    if (storedAgents) {
+      // The stored dates are strings, so we need to convert them back to Date objects
+      const parsedAgents = JSON.parse(storedAgents).map((agent: any) => ({
+        ...agent,
+        dateHired: new Date(agent.dateHired),
+      }));
+      setAgents(parsedAgents);
+    }
+  }, []);
+
   function onSubmit(values: Agent) {
-    setAgents((prevAgents) => [...prevAgents, values])
+    const updatedAgents = [...agents, values]
+    setAgents(updatedAgents)
+    localStorage.setItem("agents", JSON.stringify(updatedAgents));
     toast({
       title: "Agent Registered",
       description: `Successfully registered ${values.name}.`,
