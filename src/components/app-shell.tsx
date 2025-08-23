@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -38,7 +39,7 @@ const navItems = [
   { href: '#', icon: Video, label: 'Videocall Template' },
   { href: '/client-details', icon: Users, label: 'Client Details' },
   { href: '#', icon: ClipboardList, label: 'Order Request' },
-  { href: '#', icon: ArrowDownToLine, label: 'Deposit' },
+  { href: '/deposit', icon: ArrowDownToLine, label: 'Deposit' },
   { href: '#', icon: ArrowUpFromLine, label: 'Withdrawal' },
   { href: '/team-performance', icon: AreaChart, label: 'Team Performance' },
   { href: '/agent-performance', icon: UserCheck, label: 'Agent Performance' },
@@ -123,3 +124,5 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   )
 }
+
+    
