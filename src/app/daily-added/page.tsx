@@ -161,18 +161,18 @@ export default function DailyAddedPage() {
             <div>
                 <h2 className="text-xl font-semibold mb-4 flex items-center"><TextSearch className="mr-2 h-5 w-5" /> Parsing Area</h2>
                 <div className='space-y-4'>
-                    <div>
-                        <FormLabel htmlFor="pasted-details">1. Paste Client Details Here</FormLabel>
-                        <Textarea 
-                            id="pasted-details"
-                            placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE"
-                            className='min-h-[150px] mt-2'
-                            value={pastedDetails}
-                            onChange={(e) => setPastedDetails(e.target.value)}
-                        />
-                    </div>
                     <Form {...form}>
                         <form className="space-y-4">
+                             <div>
+                                <FormLabel htmlFor="pasted-details">1. Paste Client Details Here</FormLabel>
+                                <Textarea 
+                                    id="pasted-details"
+                                    placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE"
+                                    className='min-h-[150px] mt-2'
+                                    value={pastedDetails}
+                                    onChange={(e) => setPastedDetails(e.target.value)}
+                                />
+                            </div>
                             <FormField
                                 control={form.control}
                                 name="assignedAgent"
