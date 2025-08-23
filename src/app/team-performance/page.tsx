@@ -161,11 +161,11 @@ export default function TeamPerformancePage() {
 
         return {
             agentName: agent.name,
-            addedToday: storedAgentData?.addedToday ?? agentDailyAdded,
-            monthlyAdded: storedAgentData?.monthlyAdded ?? agentMonthlyAdded,
-            openAccounts: storedAgentData?.openAccounts ?? agentOpenAccounts,
-            totalDeposits: storedAgentData?.totalDeposits ?? agentDeposits,
-            totalWithdrawals: storedAgentData?.totalWithdrawals ?? agentWithdrawals,
+            addedToday: storedAgentData?.lastEditedBy !== 'System' ? storedAgentData.addedToday : agentDailyAdded,
+            monthlyAdded: storedAgentData?.lastEditedBy !== 'System' ? storedAgentData.monthlyAdded : agentMonthlyAdded,
+            openAccounts: storedAgentData?.lastEditedBy !== 'System' ? storedAgentData.openAccounts : agentOpenAccounts,
+            totalDeposits: storedAgentData?.lastEditedBy !== 'System' ? storedAgentData.totalDeposits : agentDeposits,
+            totalWithdrawals: storedAgentData?.lastEditedBy !== 'System' ? storedAgentData.totalWithdrawals : agentWithdrawals,
             lastEditedBy: storedAgentData?.lastEditedBy ?? "System",
         };
     });
@@ -626,3 +626,5 @@ export default function TeamPerformancePage() {
     </div>
   )
 }
+
+    
