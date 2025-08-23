@@ -68,7 +68,7 @@ export default function AgentPerformancePage() {
   function onSubmit(values: z.infer<typeof formSchema>) {
     console.log(values)
     toast({
-      title: "Client Registered",
+      title: "Agent Registered",
       description: `Successfully registered ${values.name}.`,
     })
     setOpen(false)
@@ -86,13 +86,13 @@ export default function AgentPerformancePage() {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button>Register Client</Button>
+            <Button>Register Agent</Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Register New Client</DialogTitle>
+              <DialogTitle>Register New Agent</DialogTitle>
               <DialogDescription>
-                Fill in the details below to add a new client.
+                Fill in the details below to add a new agent.
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -202,7 +202,7 @@ export default function AgentPerformancePage() {
             Agent Performance Data
           </h2>
           <p className="text-muted-foreground mt-2">
-            Client registrations and performance metrics will be displayed here.
+            Agent registrations and performance metrics will be displayed here.
           </p>
         </div>
       </div>
