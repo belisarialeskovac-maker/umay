@@ -14,6 +14,7 @@ import { Calendar } from "@/components/ui/calendar"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -152,9 +153,9 @@ export default function TeamPerformancePage() {
     const performanceData = agents.map(agent => {
         const agentDailyAdded = dailyAddedClients.filter(c => c.assignedAgent === agent.name && isToday(c.date)).length;
         const agentMonthlyAdded = dailyAddedClients.filter(c => c.assignedAgent === agent.name && isThisMonth(c.date)).length;
-        const agentOpenAccounts = clients.filter(c => c.agent === agent.name && c.status === 'Active').length;
-        const agentDeposits = deposits.filter(d => d.agent === agent.name).reduce((sum, d) => sum + d.amount, 0);
-        const agentWithdrawals = withdrawals.filter(w => w.agent === agent.name).reduce((sum, w) => sum + w.amount, 0);
+        const agentOpenAccounts = clients.filter(c => c.agent === agent.name).length;
+        const agentDeposits = deposits.filter(d => d.agent === agent.name && isThisMonth(d.date)).reduce((sum, d) => sum + d.amount, 0);
+        const agentWithdrawals = withdrawals.filter(w => w.agent === agent.name && isThisMonth(w.date)).reduce((sum, w) => sum + w.amount, 0);
         
         const storedAgentData = storedPerformance.find(p => p.agentName === agent.name);
 
