@@ -191,26 +191,32 @@ export default function ReportingPage() {
         toast({ title: "No client information", description: "Please fill in some client information before generating a report.", variant: "destructive" });
         return;
     }
+    
+    const today = new Date();
+    const dateString = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
 
     const reportParts = [
-        `AGENT NAME: ${selectedAgent}`,
-        `DATE: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+        `Agent Report - ${dateString}`,
         '',
+        'AGENT INFORMATION:',
+        `Name: ${selectedAgent}`,
         `Added Client Today: ${agentStats.addedToday}`,
         `Monthly Client Added: ${agentStats.monthlyAdded}`,
         `Open Shops: ${agentStats.openShops}`,
-        `Deposits: $${agentStats.monthlyDeposits.toFixed(2)}`,
-        '---',
+        `Deposits: ${agentStats.monthlyDeposits}`,
+        '',
+        'CLIENT INFORMATION:',
+        '',
     ];
 
     clientInfoList.forEach((client, index) => {
         if(client.conversationSummary.trim() || client.planForTomorrow.trim()) {
             reportParts.push(`CLIENT ${index + 1}:`);
-            if (client.shopId) reportParts.push(`Shop ID: ${client.shopId}`);
-            if (client.assets) reportParts.push(`Assets: ${client.assets}`);
-            if (client.clientDetails) reportParts.push(`Client Details: ${client.clientDetails}`);
-            if (client.conversationSummary) reportParts.push(`Conversation Summary: ${client.conversationSummary}`);
-            if (client.planForTomorrow) reportParts.push(`Plan for Tomorrow: ${client.planForTomorrow}`);
+            reportParts.push(`Shop ID: ${client.shopId || 'None'}`);
+            reportParts.push(`Client Details: ${client.clientDetails || 'None'}`);
+            reportParts.push(`Assets: ${client.assets || 'None'}`);
+            reportParts.push(`Conversation Summary: ${client.conversationSummary}`);
+            reportParts.push(`Plan for Tomorrow: ${client.planForTomorrow}`);
             reportParts.push('');
         }
     });
@@ -449,3 +455,5 @@ export default function ReportingPage() {
     </div>
   )
 }
+
+    
