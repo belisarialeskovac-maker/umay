@@ -60,7 +60,7 @@ type Client = {
 };
 
 export default function DailyAddedPage() {
-  const [clients, setClients] = useState<Client[]>([]);
+  const [sessionClients, setSessionClients] = useState<Client[]>([]);
   const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([]);
   const [pastedDetails, setPastedDetails] = useState('');
   const { toast } = useToast();
@@ -110,13 +110,13 @@ export default function DailyAddedPage() {
         const locMatch = pastedDetails.match(locRegex);
         const workMatch = pastedDetails.match(workRegex);
 
-        const name = nameMatch ? nameMatch[1].trim() : '';
+        const name = nameMatch ? nameMatch[1].trim() : 'N/A';
         const age = ageMatch ? parseInt(ageMatch[1], 10) : 0;
-        const location = locMatch ? locMatch[1].trim() : '';
-        const work = workMatch ? workMatch[1].trim() : '';
+        const location = locMatch ? locMatch[1].trim() : 'N/A';
+        const work = workMatch ? workMatch[1].trim() : 'N/A';
 
-        if (!name || !age || !location || !work) {
-            throw new Error("Could not parse all details. Please check the format.");
+        if (name === 'N/A' && age === 0 && location === 'N/A' && work === 'N/A') {
+            throw new Error("Could not parse any details. Please check the format.");
         }
 
         const newClient: Client = {
@@ -128,18 +128,26 @@ export default function DailyAddedPage() {
           date: new Date(),
         };
 
-        setClients((prevClients) => [...prevClients, newClient]);
+        // Add to session clients for immediate display
+        setSessionClients((prevClients) => [...prevClients, newClient]);
+        
+        // Add to persistent storage
+        const allDailyClients = JSON.parse(localStorage.getItem('dailyAddedClients') || '[]');
+        allDailyClients.push(newClient);
+        localStorage.setItem('dailyAddedClients', JSON.stringify(allDailyClients));
+
         toast({
           title: 'Client Added',
-          description: `${name} has been successfully added to the list.`,
+          description: `${name} has been successfully added.`,
         });
+
         form.reset({ assignedAgent: "" });
         setPastedDetails('');
 
     } catch (error: any) {
         toast({
             title: 'Parsing Failed',
-            description: error.message || 'Please ensure the pasted text is in the correct format with labels like "Name:", "Age:", "Location:", "Work:".',
+            description: error.message || 'Please ensure the pasted text is in a supported format with labels like "Name:", "Age:", "Location:", "Work:".',
             variant: 'destructive',
         });
     }
@@ -163,7 +171,7 @@ export default function DailyAddedPage() {
                 <div className='space-y-4'>
                     <Form {...form}>
                         <form className="space-y-4">
-                             <div>
+                            <div>
                                 <FormLabel htmlFor="pasted-details">1. Paste Client Details Here</FormLabel>
                                 <Textarea 
                                     id="pasted-details"
@@ -179,7 +187,7 @@ export default function DailyAddedPage() {
                                 render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>2. Select Assigned Agent</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value || ''}>
                                         <FormControl>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select an agent" />
@@ -207,8 +215,8 @@ export default function DailyAddedPage() {
         </div>
         
         <div>
-            <h2 className="text-xl font-semibold mb-4">Today's Clients</h2>
-            {clients.length > 0 ? (
+            <h2 className="text-xl font-semibold mb-4">Added This Session</h2>
+            {sessionClients.length > 0 ? (
                 <div className="rounded-lg border bg-card">
                 <Table>
                     <TableHeader>
@@ -222,7 +230,7 @@ export default function DailyAddedPage() {
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {clients.map((client, index) => (
+                    {sessionClients.map((client, index) => (
                         <TableRow key={index}>
                         <TableCell>{client.name}</TableCell>
                         <TableCell>{client.age}</TableCell>
@@ -242,7 +250,7 @@ export default function DailyAddedPage() {
                     No Clients Added Today
                     </h2>
                     <p className="text-muted-foreground mt-2">
-                    Added clients will appear here.
+                    Clients added in this session will appear here.
                     </p>
                 </div>
                 </div>
