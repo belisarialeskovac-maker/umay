@@ -40,7 +40,7 @@ const navItems = [
   { href: '/client-details', icon: Users, label: 'Client Details' },
   { href: '#', icon: ClipboardList, label: 'Order Request' },
   { href: '/deposit', icon: ArrowDownToLine, label: 'Deposit' },
-  { href: '#', icon: ArrowUpFromLine, label: 'Withdrawal' },
+  { href: '/withdrawal', icon: ArrowUpFromLine, label: 'Withdrawal' },
   { href: '/team-performance', icon: AreaChart, label: 'Team Performance' },
   { href: '/agent-performance', icon: UserCheck, label: 'Agent Performance' },
   { href: '#', icon: FileText, label: 'Reporting' },
