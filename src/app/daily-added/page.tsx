@@ -6,18 +6,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus } from 'lucide-react';
+import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
@@ -43,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea';
 
 const agentSchema = z.object({
   name: z.string(),
@@ -70,7 +62,7 @@ type Client = ClientForm & {
 export default function DailyAddedPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([]);
-  const [open, setOpen] = useState(false)
+  const [pastedDetails, setPastedDetails] = useState('');
   const { toast } = useToast();
 
   const form = useForm<ClientForm>({
@@ -95,6 +87,62 @@ export default function DailyAddedPage() {
     }
   }, []);
 
+  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const text = event.clipboardData.getData('text');
+    setPastedDetails(text);
+    parseDetails(text);
+  };
+
+  const parseDetails = (text: string) => {
+    if (!text) {
+        toast({
+            title: 'No details provided',
+            description: 'Please paste the client details into the text area.',
+            variant: 'destructive',
+        });
+        return;
+    }
+    try {
+      const lines = text.split('\n').filter(line => line.trim() !== '');
+      const details: Partial<ClientForm> = {};
+      
+      lines.forEach(line => {
+        const [rawKey, ...valueParts] = line.split(':');
+        const key = rawKey.trim().toLowerCase();
+        const value = valueParts.join(':').trim();
+
+        if (key.includes('name')) details.name = value;
+        else if (key.includes('age')) details.age = parseInt(value.match(/\d+/)?.[0] || '0', 10);
+        else if (key.includes('loc')) details.location = value;
+        else if (key.includes('work') || key.includes('occupation')) details.work = value;
+      });
+
+      if (!details.name || !details.age || !details.location || !details.work) {
+        throw new Error("Could not parse all required fields. Please check the format.");
+      }
+
+      form.reset({
+        name: details.name || '',
+        age: details.age || undefined,
+        location: details.location || '',
+        work: details.work || '',
+        assignedAgent: form.getValues('assignedAgent'),
+      });
+
+      toast({
+        title: 'Details Parsed',
+        description: 'Client details have been populated in the form.',
+      });
+
+    } catch (error: any) {
+        toast({
+            title: 'Parsing Failed',
+            description: error.message || 'Please ensure the pasted text is in the correct format.',
+            variant: 'destructive',
+        });
+    }
+  }
+
   function onSubmit(values: ClientForm) {
     const newClient: Client = {
       ...values,
@@ -105,8 +153,8 @@ export default function DailyAddedPage() {
       title: 'Client Added',
       description: `${values.name} has been successfully added to the list.`,
     });
-    setOpen(false);
     form.reset();
+    setPastedDetails('');
   }
 
   return (
@@ -115,20 +163,33 @@ export default function DailyAddedPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Daily Added Clients</h1>
           <p className="text-muted-foreground mt-1">
-            Add new clients to the daily list.
+            Paste client details to add them to the daily list.
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>Add Client</Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Add New Client</DialogTitle>
-              <DialogDescription>
-                Fill in the details below to add a new client.
-              </DialogDescription>
-            </DialogHeader>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div>
+            <h2 className="text-xl font-semibold mb-4 flex items-center"><TextSearch className="mr-2 h-5 w-5" /> Parsing Area</h2>
+            <div className='space-y-4'>
+                <div>
+                    <FormLabel htmlFor="pasted-details">Paste Client Details Here</FormLabel>
+                    <Textarea 
+                        id="pasted-details"
+                        placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE"
+                        className='min-h-[150px] mt-2'
+                        value={pastedDetails}
+                        onChange={(e) => setPastedDetails(e.target.value)}
+                        onPaste={handlePaste}
+                    />
+                     <p className="text-xs text-muted-foreground mt-2">Details will be automatically parsed and populated into the form below.</p>
+                </div>
+                <Button onClick={() => parseDetails(pastedDetails)} className='w-full'>
+                    <TextSearch className="mr-2 h-4 w-4" /> Parse Details
+                </Button>
+            </div>
+            
+            <h2 className="text-xl font-semibold mt-8 mb-4">Client Form</h2>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -189,7 +250,7 @@ export default function DailyAddedPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assigned Agent</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select an agent" />
@@ -207,54 +268,56 @@ export default function DailyAddedPage() {
                     </FormItem>
                   )}
                 />
-                <DialogFooter>
-                  <Button type="submit">Add Client</Button>
-                </DialogFooter>
+                <Button type="submit" className='w-full'>Add Client to Table</Button>
               </form>
             </Form>
-          </DialogContent>
-        </Dialog>
+        </div>
+        
+        <div>
+            <h2 className="text-xl font-semibold mb-4">Today's Clients</h2>
+            {clients.length > 0 ? (
+                <div className="rounded-lg border bg-card">
+                <Table>
+                    <TableHeader>
+                    <TableRow>
+                        <TableHead><User className="inline-block mr-2 h-4 w-4" />Name</TableHead>
+                        <TableHead><ClipboardList className="inline-block mr-2 h-4 w-4" />Age</TableHead>
+                        <TableHead><MapPin className="inline-block mr-2 h-4 w-4" />Location</TableHead>
+                        <TableHead><Briefcase className="inline-block mr-2 h-4 w-4" />Work</TableHead>
+                        <TableHead><UserPlus className="inline-block mr-2 h-4 w-4" />Assigned Agent</TableHead>
+                        <TableHead><Calendar className="inline-block mr-2 h-4 w-4" />Date</TableHead>
+                    </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                    {clients.map((client, index) => (
+                        <TableRow key={index}>
+                        <TableCell>{client.name}</TableCell>
+                        <TableCell>{client.age}</TableCell>
+                        <TableCell>{client.location}</TableCell>
+                        <TableCell>{client.work}</TableCell>
+                        <TableCell>{client.assignedAgent}</TableCell>
+                        <TableCell>{format(client.date, 'PPP')}</TableCell>
+                        </TableRow>
+                    ))}
+                    </TableBody>
+                </Table>
+                </div>
+            ) : (
+                <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh]">
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                    No Clients Added Today
+                    </h2>
+                    <p className="text-muted-foreground mt-2">
+                    Added clients will appear here.
+                    </p>
+                </div>
+                </div>
+            )}
+        </div>
       </div>
-
-      {clients.length > 0 ? (
-        <div className="rounded-lg border bg-card mt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead><User className="inline-block mr-2 h-4 w-4" />Name</TableHead>
-                <TableHead><ClipboardList className="inline-block mr-2 h-4 w-4" />Age</TableHead>
-                <TableHead><MapPin className="inline-block mr-2 h-4 w-4" />Location</TableHead>
-                <TableHead><Briefcase className="inline-block mr-2 h-4 w-4" />Work</TableHead>
-                <TableHead><UserPlus className="inline-block mr-2 h-4 w-4" />Assigned Agent</TableHead>
-                <TableHead><Calendar className="inline-block mr-2 h-4 w-4" />Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {clients.map((client, index) => (
-                <TableRow key={index}>
-                  <TableCell>{client.name}</TableCell>
-                  <TableCell>{client.age}</TableCell>
-                  <TableCell>{client.location}</TableCell>
-                  <TableCell>{client.work}</TableCell>
-                  <TableCell>{client.assignedAgent}</TableCell>
-                  <TableCell>{format(client.date, 'PPP')}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] mt-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">
-              No Clients Added Today
-            </h2>
-            <p className="text-muted-foreground mt-2">
-              Added clients will appear here.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+
+    
