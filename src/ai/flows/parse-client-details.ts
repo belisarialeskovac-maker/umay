@@ -26,7 +26,7 @@ export type ClientDetailsOutput = z.infer<typeof ClientDetailsOutputSchema>;
 
 export async function parseClientDetails(input: ClientDetailsInput): Promise<ClientDetailsOutput> {
   const result = await parseClientDetailsFlow(input);
-  // The schema has `name` but the prompt asks for `clientName`, so we need to map it.
+  // The prompt's output schema uses clientName, so we map it to the 'name' field of ClientDetailsOutputSchema.
   return {
     name: (result as any).clientName,
     age: result.age,
