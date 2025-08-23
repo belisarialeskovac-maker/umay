@@ -45,8 +45,8 @@ const navItems = [
   { href: '/agent-performance', icon: UserCheck, label: 'Agent Performance' },
   { href: '/reporting', icon: FileText, label: 'Reporting' },
   { href: '/daily-added', icon: CalendarPlus, label: 'Daily Added' },
+  { href: '/inventory', icon: Boxes, label: 'Inventory' },
   { href: '#', icon: Megaphone, label: 'Announcement' },
-  { href: '#', icon: Boxes, label: 'Inventory' },
 ];
 
 const settingsNav = { href: '#', icon: Settings, label: 'Settings' };
