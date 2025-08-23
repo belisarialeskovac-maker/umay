@@ -85,9 +85,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SidebarFooter className="flex flex-col gap-4">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip={settingsNav.label}>
-                <settingsNav.icon />
-                <span>{settingsNav.label}</span>
+              <SidebarMenuButton asChild tooltip={settingsNav.label}>
+                <Link href={settingsNav.href}>
+                  <settingsNav.icon />
+                  <span>{settingsNav.label}</span>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
