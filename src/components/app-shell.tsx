@@ -36,7 +36,7 @@ import { Button } from '@/components/ui/button';
 
 const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '#', icon: Video, label: 'Videocall Template' },
+  { href: '/videocall-template', icon: Video, label: 'Videocall Template' },
   { href: '/client-details', icon: Users, label: 'Client Details' },
   { href: '#', icon: ClipboardList, label: 'Order Request' },
   { href: '/deposit', icon: ArrowDownToLine, label: 'Deposit' },
@@ -124,5 +124,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   )
 }
-
-    
