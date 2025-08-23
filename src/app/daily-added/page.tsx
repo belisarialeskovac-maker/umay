@@ -1,5 +1,5 @@
 
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
@@ -9,7 +9,24 @@ import { format } from 'date-fns';
 import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -25,9 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { parseClientDetails } from '@/ai/flows/parse-client-details';
 
 const agentSchema = z.object({
   name: z.string(),
@@ -38,24 +53,36 @@ const agentSchema = z.object({
 
 type Agent = z.infer<typeof agentSchema>;
 
-const clientSchema = z.object({
-  name: z.string(),
-  age: z.number(),
-  location: z.string(),
-  work: z.string(),
-  assignedAgent: z.string(),
-  date: z.date(),
+const clientFormSchema = z.object({
+  name: z.string().min(1, "Name is required."),
+  age: z.coerce.number().positive("Age must be a positive number."),
+  location: z.string().min(1, "Location is required."),
+  work: z.string().min(1, "Work is required."),
+  assignedAgent: z.string().min(1, "An agent must be selected."),
 });
 
-type Client = z.infer<typeof clientSchema>;
+type ClientForm = z.infer<typeof clientFormSchema>;
+
+type Client = ClientForm & {
+    date: Date;
+};
 
 export default function DailyAddedPage() {
-  const [pastedDetails, setPastedDetails] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([]);
-  const [selectedAgent, setSelectedAgent] = useState('');
+  const [open, setOpen] = useState(false)
   const { toast } = useToast();
+
+  const form = useForm<ClientForm>({
+    resolver: zodResolver(clientFormSchema),
+    defaultValues: {
+        name: "",
+        age: undefined,
+        location: "",
+        work: "",
+        assignedAgent: "",
+    },
+  });
 
   useEffect(() => {
     const storedAgents = localStorage.getItem("agents");
@@ -68,53 +95,19 @@ export default function DailyAddedPage() {
     }
   }, []);
 
-  const handleProcess = async () => {
-    if (!pastedDetails.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please paste client details before processing.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    if (!selectedAgent) {
-        toast({
-          title: 'Error',
-          description: 'Please select an agent.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-    setIsLoading(true);
-    try {
-      const parsedData = await parseClientDetails({ details: pastedDetails });
-      if (parsedData && parsedData.name) {
-        const newClient: Client = {
-          ...parsedData,
-          assignedAgent: selectedAgent,
-          date: new Date(),
-        };
-        setClients((prevClients) => [...prevClients, newClient]);
-        setPastedDetails('');
-        toast({
-          title: 'Client Added',
-          description: `${parsedData.name} has been successfully added to the list.`,
-        });
-      } else {
-        throw new Error('Failed to parse client details.');
-      }
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: 'Error',
-        description: 'Failed to parse client details. Please check the format and try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  function onSubmit(values: ClientForm) {
+    const newClient: Client = {
+      ...values,
+      date: new Date(),
+    };
+    setClients((prevClients) => [...prevClients, newClient]);
+    toast({
+      title: 'Client Added',
+      description: `${values.name} has been successfully added to the list.`,
+    });
+    setOpen(false);
+    form.reset();
+  }
 
   return (
     <div className="w-full h-full">
@@ -122,44 +115,106 @@ export default function DailyAddedPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Daily Added Clients</h1>
           <p className="text-muted-foreground mt-1">
-            Paste client details to add them to the daily list.
+            Add new clients to the daily list.
           </p>
         </div>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button>Add Client</Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Add New Client</DialogTitle>
+              <DialogDescription>
+                Fill in the details below to add a new client.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="age"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Age</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="40" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="location"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location</FormLabel>
+                      <FormControl>
+                        <Input placeholder="UAE" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="work"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Work</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Captain in a cruise ship" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="assignedAgent"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assigned Agent</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an agent" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {registeredAgents.map((agent) => (
+                            <SelectItem key={agent.name} value={agent.name}>
+                              {agent.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="submit">Add Client</Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Process New Client</CardTitle>
-          <CardDescription>Paste raw client information in the text area below.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Textarea
-              value={pastedDetails}
-              onChange={(e) => setPastedDetails(e.target.value)}
-              placeholder={`Client Name: Jason\nAge: 40\nWork: Captain in a cruise ship\nLocation: UAE`}
-              className="md:col-span-2 min-h-[150px]"
-            />
-             <div className="space-y-4">
-                <Select onValueChange={setSelectedAgent} value={selectedAgent}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select an Assigned Agent" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {registeredAgents.map((agent) => (
-                        <SelectItem key={agent.name} value={agent.name}>
-                            {agent.name}
-                        </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                 <Button onClick={handleProcess} disabled={isLoading} className="w-full">
-                    {isLoading ? 'Processing...' : 'Process Details'}
-                </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {clients.length > 0 ? (
         <div className="rounded-lg border bg-card mt-6">
@@ -189,13 +244,13 @@ export default function DailyAddedPage() {
           </Table>
         </div>
       ) : (
-        <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[40vh] mt-6">
+        <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] mt-6">
           <div className="text-center">
             <h2 className="text-2xl font-bold tracking-tight text-foreground">
               No Clients Added Today
             </h2>
             <p className="text-muted-foreground mt-2">
-              Processed clients will appear here.
+              Added clients will appear here.
             </p>
           </div>
         </div>
