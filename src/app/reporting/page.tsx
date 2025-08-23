@@ -5,8 +5,8 @@ import { useState, useEffect, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { isToday, isThisMonth, startOfMonth, endOfMonth } from "date-fns"
-import { User, Calendar, BarChart, Banknote } from "lucide-react"
+import { isToday, isThisMonth } from "date-fns"
+import { User, Calendar, BarChart, Banknote, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react"
 
 import {
   Form,
@@ -23,9 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Progress } from "@/components/ui/progress"
+import { useToast } from "@/hooks/use-toast"
 
 // --- Data Schemas ---
 
@@ -63,6 +67,17 @@ const reportingFormSchema = z.object({
 });
 type ReportingForm = z.infer<typeof reportingFormSchema>;
 
+// --- Client Information Form ---
+type ClientInformation = {
+    id: number;
+    shopId: string;
+    assets: string;
+    clientDetails: string;
+    conversationSummary: string;
+    planForTomorrow: string;
+    isCollapsed: boolean;
+};
+
 
 export default function ReportingPage() {
   const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([])
@@ -70,6 +85,12 @@ export default function ReportingPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [deposits, setDeposits] = useState<Deposit[]>([])
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
+  
+  const [clientInfoList, setClientInfoList] = useState<ClientInformation[]>([
+    { id: 1, shopId: '', assets: '', clientDetails: '', conversationSummary: '', planForTomorrow: '', isCollapsed: false },
+  ]);
+  
+  const { toast } = useToast();
 
   const form = useForm<ReportingForm>({
     resolver: zodResolver(reportingFormSchema),
@@ -121,9 +142,44 @@ export default function ReportingPage() {
     form.setValue("agent", agentName);
   };
   
+  const addClient = () => {
+    const newClient: ClientInformation = {
+      id: clientInfoList.length ? Math.max(...clientInfoList.map(c => c.id)) + 1 : 1,
+      shopId: '',
+      assets: '',
+      clientDetails: '',
+      conversationSummary: '',
+      planForTomorrow: '',
+      isCollapsed: false,
+    };
+    setClientInfoList([...clientInfoList, newClient]);
+  };
+  
+  const removeClient = (id: number) => {
+    setClientInfoList(clientInfoList.filter(client => client.id !== id));
+  };
+  
+  const handleClientInfoChange = (id: number, field: keyof Omit<ClientInformation, 'id' | 'isCollapsed'>, value: string) => {
+    setClientInfoList(clientInfoList.map(client =>
+      client.id === id ? { ...client, [field]: value } : client
+    ));
+  };
+
+  const toggleClientCollapse = (id: number) => {
+    setClientInfoList(clientInfoList.map(client =>
+      client.id === id ? { ...client, isCollapsed: !client.isCollapsed } : client
+    ));
+  }
+
+  const getProgress = (client: ClientInformation) => {
+    const requiredFields: (keyof Omit<ClientInformation, 'id'| 'isCollapsed' | 'shopId' | 'assets' | 'clientDetails'>)[] = ['conversationSummary', 'planForTomorrow'];
+    const filledCount = requiredFields.filter(field => client[field].trim() !== '').length;
+    return (filledCount / requiredFields.length) * 100;
+  }
+  
   return (
-    <div className="w-full h-full">
-      <div className="flex justify-between items-center mb-6">
+    <div className="w-full h-full space-y-6">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Reporting</h1>
           <p className="text-muted-foreground mt-1">
@@ -193,6 +249,70 @@ export default function ReportingPage() {
                     </div>
                 )}
             </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row justify-between items-center">
+          <div>
+            <CardTitle>Client Information</CardTitle>
+            <CardDescription>Enter details for each client</CardDescription>
+          </div>
+          <Button variant="outline" onClick={addClient}>
+            <Plus className="mr-2 h-4 w-4"/> Add Client
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+            {clientInfoList.map((client, index) => (
+                <Card key={client.id} className="overflow-hidden">
+                    <CardHeader className="bg-muted/50 p-4 flex flex-row justify-between items-center cursor-pointer" onClick={() => toggleClientCollapse(client.id)}>
+                        <div className="flex items-center gap-4">
+                            <CardTitle className="text-lg">Client {index + 1}</CardTitle>
+                            <div className="flex items-center gap-2">
+                                <Progress value={getProgress(client)} className="w-24 h-2"/>
+                                <span className="text-xs text-muted-foreground">{getProgress(client) === 100 ? '2/2 completed' : `${Math.round(getProgress(client)/100 * 2)}/2 completed`}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); removeClient(client.id); }} className="h-8 w-8">
+                                <Trash2 className="h-4 w-4"/>
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                {client.isCollapsed ? <ChevronDown className="h-4 w-4"/> : <ChevronUp className="h-4 w-4"/>}
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    {!client.isCollapsed && (
+                        <CardContent className="p-6 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <Label htmlFor={`shopId-${client.id}`}>Shop ID</Label>
+                                    <Input id={`shopId-${client.id}`} value={client.shopId} onChange={(e) => handleClientInfoChange(client.id, 'shopId', e.target.value)} placeholder="Enter shop ID"/>
+                                </div>
+                                <div>
+                                    <Label htmlFor={`assets-${client.id}`}>Assets</Label>
+                                    <Input id={`assets-${client.id}`} value={client.assets} onChange={(e) => handleClientInfoChange(client.id, 'assets', e.target.value)} placeholder="Enter client assets"/>
+                                </div>
+                            </div>
+                            <div>
+                                <Label htmlFor={`clientDetails-${client.id}`}>Client Details</Label>
+                                <Textarea id={`clientDetails-${client.id}`} value={client.clientDetails} onChange={(e) => handleClientInfoChange(client.id, 'clientDetails', e.target.value)} placeholder="Client Name/ Age/ Job/Location"/>
+                            </div>
+                            <div>
+                                <Label htmlFor={`conversationSummary-${client.id}`}>Conversation Summary *</Label>
+                                <Textarea id={`conversationSummary-${client.id}`} value={client.conversationSummary} onChange={(e) => handleClientInfoChange(client.id, 'conversationSummary', e.target.value)} placeholder="Summarize your conversation"/>
+                            </div>
+                            <div>
+                                <Label htmlFor={`planForTomorrow-${client.id}`}>Plan for Tomorrow *</Label>
+                                <Textarea id={`planForTomorrow-${client.id}`} value={client.planForTomorrow} onChange={(e) => handleClientInfoChange(client.id, 'planForTomorrow', e.target.value)} placeholder="What's the plan for tomorrow?"/>
+                            </div>
+                        </CardContent>
+                    )}
+                </Card>
+            ))}
+            <Button variant="outline" onClick={addClient} className="w-full">
+                <Plus className="mr-2 h-4 w-4"/> Add Another Client
+            </Button>
         </CardContent>
       </Card>
     </div>
