@@ -48,14 +48,16 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
-const agentSchema = z.object({
-    name: z.string(),
-    email: z.string(),
-    dateHired: z.date(),
-    agentType: z.string(),
+const clientSchema = z.object({
+    shopId: z.string(),
+    clientName: z.string(),
+    agent: z.string(),
+    kycCompletedDate: z.date(),
+    status: z.string(),
+    clientDetails: z.string(),
 })
 
-type Agent = z.infer<typeof agentSchema>;
+type Client = z.infer<typeof clientSchema>;
 
 const paymentModes = ["Ewallet/Online Banking", "Crypto"] as const
 
@@ -75,7 +77,7 @@ type Deposit = z.infer<typeof formSchema>
 export default function DepositPage() {
   const [open, setOpen] = useState(false)
   const [deposits, setDeposits] = useState<Deposit[]>([])
-  const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   const { toast } = useToast()
 
   const form = useForm<Deposit>({
@@ -90,14 +92,16 @@ export default function DepositPage() {
     },
   })
 
+  const watchedShopId = form.watch("shopId");
+
   useEffect(() => {
-    const storedAgents = localStorage.getItem("agents");
-    if (storedAgents) {
-      const parsedAgents = JSON.parse(storedAgents).map((agent: any) => ({
-        ...agent,
-        dateHired: new Date(agent.dateHired),
+    const storedClients = localStorage.getItem("clients");
+    if (storedClients) {
+      const parsedClients = JSON.parse(storedClients).map((client: any) => ({
+        ...client,
+        kycCompletedDate: new Date(client.kycCompletedDate),
       }));
-      setRegisteredAgents(parsedAgents);
+      setClients(parsedClients);
     }
 
     const storedDeposits = localStorage.getItem("deposits");
@@ -110,6 +114,19 @@ export default function DepositPage() {
     }
   }, []);
 
+  useEffect(() => {
+    if (watchedShopId) {
+      const client = clients.find(c => c.shopId === watchedShopId);
+      if (client) {
+        form.setValue("clientName", client.clientName);
+        form.setValue("agent", client.agent);
+      } else {
+        form.setValue("clientName", "");
+        form.setValue("agent", "");
+      }
+    }
+  }, [watchedShopId, clients, form]);
+
   function onSubmit(values: Deposit) {
     const updatedDeposits = [...deposits, values]
     setDeposits(updatedDeposits)
@@ -119,8 +136,17 @@ export default function DepositPage() {
       description: `Successfully added deposit for ${values.clientName}.`,
     })
     setOpen(false)
-    form.reset()
+    form.reset({
+        shopId: "",
+        clientName: "",
+        agent: "",
+        paymentMode: "Ewallet/Online Banking",
+        amount: 0,
+        date: new Date(),
+    })
   }
+
+  const clientFound = !!watchedShopId && clients.some(c => c.shopId === watchedShopId);
 
   return (
     <div className="w-full h-full">
@@ -164,7 +190,7 @@ export default function DepositPage() {
                     <FormItem>
                       <FormLabel>Client Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="John Doe" {...field} />
+                        <Input placeholder="Client Name (auto-filled)" {...field} disabled={clientFound} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -173,12 +199,9 @@ export default function DepositPage() {
                  <FormField control={form.control} name="agent" render={({ field }) => (
                     <FormItem>
                     <FormLabel>Agent</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                        {registeredAgents.map(agent => <SelectItem key={agent.name} value={agent.name}>{agent.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
+                     <FormControl>
+                        <Input placeholder="Agent (auto-filled)" {...field} disabled={clientFound} />
+                      </FormControl>
                     <FormMessage />
                     </FormItem>
                 )} />
