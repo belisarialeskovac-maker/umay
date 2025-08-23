@@ -43,7 +43,7 @@ const navItems = [
   { href: '/withdrawal', icon: ArrowUpFromLine, label: 'Withdrawal' },
   { href: '/team-performance', icon: AreaChart, label: 'Team Performance' },
   { href: '/agent-performance', icon: UserCheck, label: 'Agent Performance' },
-  { href: '#', icon: FileText, label: 'Reporting' },
+  { href: '/reporting', icon: FileText, label: 'Reporting' },
   { href: '/daily-added', icon: CalendarPlus, label: 'Daily Added' },
   { href: '#', icon: Megaphone, label: 'Announcement' },
   { href: '#', icon: Boxes, label: 'Inventory' },
