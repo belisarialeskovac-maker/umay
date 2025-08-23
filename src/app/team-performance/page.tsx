@@ -1,12 +1,12 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react"
+import { format, isToday, isThisMonth } from "date-fns"
+import { CalendarIcon, Edit, Save, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -14,8 +14,6 @@ import { Calendar } from "@/components/ui/calendar"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -55,14 +53,49 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { Textarea } from "@/components/ui/textarea"
 
-const agentSchema = z.object({
-  name: z.string(),
-  email: z.string(),
-  dateHired: z.date(),
-  agentType: z.string(),
-})
+type Agent = {
+  name: string;
+  email: string;
+  dateHired: Date;
+  agentType: string;
+}
 
-type Agent = z.infer<typeof agentSchema>;
+type Client = {
+    shopId: string;
+    clientName: string;
+    agent: string;
+    kycCompletedDate: Date;
+    status: "In Process" | "Active" | "Eliminated";
+    clientDetails: string;
+}
+
+type DailyAddedClient = {
+    name: string;
+    age: number;
+    location: string;
+    work: string;
+    assignedAgent: string;
+    date: Date;
+};
+
+type Transaction = {
+    shopId: string;
+    clientName: string;
+    agent: string;
+    date: Date;
+    amount: number;
+    paymentMode: string;
+}
+
+type TeamPerformanceData = {
+    agentName: string;
+    addedToday: number;
+    monthlyAdded: number;
+    openAccounts: number;
+    totalDeposits: number;
+    totalWithdrawals: number;
+    lastEditedBy: string;
+};
 
 const absenceSchema = z.object({
   date: z.date({ required_error: "Date is required." }),
@@ -93,6 +126,10 @@ export default function TeamPerformancePage() {
   const [penalties, setPenalties] = useState<Penalty[]>([])
   const [rewards, setRewards] = useState<Reward[]>([])
   const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([])
+  const [teamPerformance, setTeamPerformance] = useState<TeamPerformanceData[]>([])
+  const [editingAgent, setEditingAgent] = useState<string | null>(null);
+  const [editedData, setEditedData] = useState<Partial<TeamPerformanceData>>({});
+
 
   const [absenceDialogOpen, setAbsenceDialogOpen] = useState(false)
   const [penaltyDialogOpen, setPenaltyDialogOpen] = useState(false)
@@ -104,17 +141,47 @@ export default function TeamPerformancePage() {
   const penaltyForm = useForm<Penalty>({ resolver: zodResolver(penaltySchema) })
   const rewardForm = useForm<Reward>({ resolver: zodResolver(rewardSchema) })
 
+  const calculatePerformanceMetrics = useCallback((agents: Agent[]) => {
+    const dailyAddedClients: DailyAddedClient[] = JSON.parse(localStorage.getItem('dailyAddedClients') || '[]').map((c: any) => ({ ...c, date: new Date(c.date) }));
+    const clients: Client[] = JSON.parse(localStorage.getItem('clients') || '[]').map((c: any) => ({ ...c, kycCompletedDate: new Date(c.kycCompletedDate) }));
+    const deposits: Transaction[] = JSON.parse(localStorage.getItem('deposits') || '[]').map((d: any) => ({ ...d, date: new Date(d.date) }));
+    const withdrawals: Transaction[] = JSON.parse(localStorage.getItem('withdrawals') || '[]').map((w: any) => ({ ...w, date: new Date(w.date) }));
+    const storedPerformance: TeamPerformanceData[] = JSON.parse(localStorage.getItem('teamPerformance') || '[]');
+
+    const performanceData = agents.map(agent => {
+        const agentDailyAdded = dailyAddedClients.filter(c => c.assignedAgent === agent.name && isToday(c.date)).length;
+        const agentMonthlyAdded = dailyAddedClients.filter(c => c.assignedAgent === agent.name && isThisMonth(c.date)).length;
+        const agentOpenAccounts = clients.filter(c => c.agent === agent.name && c.status === 'Active').length;
+        const agentDeposits = deposits.filter(d => d.agent === agent.name).reduce((sum, d) => sum + d.amount, 0);
+        const agentWithdrawals = withdrawals.filter(w => w.agent === agent.name).reduce((sum, w) => sum + w.amount, 0);
+        
+        const storedAgentData = storedPerformance.find(p => p.agentName === agent.name);
+
+        return {
+            agentName: agent.name,
+            addedToday: storedAgentData?.addedToday ?? agentDailyAdded,
+            monthlyAdded: storedAgentData?.monthlyAdded ?? agentMonthlyAdded,
+            openAccounts: storedAgentData?.openAccounts ?? agentOpenAccounts,
+            totalDeposits: storedAgentData?.totalDeposits ?? agentDeposits,
+            totalWithdrawals: storedAgentData?.totalWithdrawals ?? agentWithdrawals,
+            lastEditedBy: storedAgentData?.lastEditedBy ?? "System",
+        };
+    });
+
+    setTeamPerformance(performanceData);
+  }, []);
+
   useEffect(() => {
     const storedAgents = localStorage.getItem("agents");
     if (storedAgents) {
-      // The stored dates are strings, so we need to convert them back to Date objects
-      const parsedAgents = JSON.parse(storedAgents).map((agent: any) => ({
+      const parsedAgents: Agent[] = JSON.parse(storedAgents).map((agent: any) => ({
         ...agent,
         dateHired: new Date(agent.dateHired),
       }));
       setRegisteredAgents(parsedAgents);
+      calculatePerformanceMetrics(parsedAgents);
     }
-  }, []);
+  }, [calculatePerformanceMetrics]);
 
   const onAbsenceSubmit = (values: Absence) => {
     setAbsences((prev) => [...prev, values])
@@ -137,6 +204,34 @@ export default function TeamPerformancePage() {
     rewardForm.reset({agent: '', remarks: '', status: 'Unclaimed'})
   }
 
+  const handleEdit = (agentName: string) => {
+    setEditingAgent(agentName);
+    const agentData = teamPerformance.find(p => p.agentName === agentName);
+    if(agentData) {
+        setEditedData(agentData);
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingAgent(null);
+    setEditedData({});
+  }
+  
+  const handleSave = (agentName: string) => {
+    const updatedPerformance = teamPerformance.map(p => 
+        p.agentName === agentName ? { ...p, ...editedData, lastEditedBy: 'Admin' } : p
+    );
+    setTeamPerformance(updatedPerformance);
+    localStorage.setItem('teamPerformance', JSON.stringify(updatedPerformance));
+    setEditingAgent(null);
+    setEditedData({});
+    toast({ title: "Performance Updated", description: `Data for ${agentName} has been saved.` });
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: keyof TeamPerformanceData) => {
+      const value = e.target.type === 'number' ? Number(e.target.value) : e.target.value;
+      setEditedData(prev => ({...prev, [field]: value}));
+  }
 
   return (
     <div className="w-full h-full">
@@ -148,12 +243,83 @@ export default function TeamPerformancePage() {
           </p>
         </div>
       </div>
-      <Tabs defaultValue="absences">
+      <Tabs defaultValue="team">
         <TabsList>
+          <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="absences">Absences</TabsTrigger>
           <TabsTrigger value="penalties">Penalties</TabsTrigger>
           <TabsTrigger value="rewards">Rewards</TabsTrigger>
         </TabsList>
+        <TabsContent value="team">
+             {teamPerformance.length > 0 ? (
+                <div className="rounded-lg border bg-card mt-4">
+                <Table>
+                    <TableHeader>
+                    <TableRow>
+                        <TableHead>Agent Name</TableHead>
+                        <TableHead>Added Today</TableHead>
+                        <TableHead>Monthly Added</TableHead>
+                        <TableHead>Open Accounts</TableHead>
+                        <TableHead>Total Deposits</TableHead>
+                        <TableHead>Total Withdrawals</TableHead>
+                        <TableHead>Last Edited By</TableHead>
+                        <TableHead>Actions</TableHead>
+                    </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                    {teamPerformance.map((item, index) => (
+                        <TableRow key={index}>
+                            <TableCell>{item.agentName}</TableCell>
+                            <TableCell>
+                                {editingAgent === item.agentName ? (
+                                    <Input type="number" value={editedData.addedToday} onChange={e => handleInputChange(e, 'addedToday')} className="w-24" />
+                                ) : item.addedToday}
+                            </TableCell>
+                             <TableCell>
+                                {editingAgent === item.agentName ? (
+                                    <Input type="number" value={editedData.monthlyAdded} onChange={e => handleInputChange(e, 'monthlyAdded')} className="w-24" />
+                                ) : item.monthlyAdded}
+                            </TableCell>
+                            <TableCell>
+                                {editingAgent === item.agentName ? (
+                                    <Input type="number" value={editedData.openAccounts} onChange={e => handleInputChange(e, 'openAccounts')} className="w-24" />
+                                ) : item.openAccounts}
+                            </TableCell>
+                            <TableCell>
+                                {editingAgent === item.agentName ? (
+                                    <Input type="number" value={editedData.totalDeposits} onChange={e => handleInputChange(e, 'totalDeposits')} className="w-32" />
+                                ) : `$${item.totalDeposits.toFixed(2)}`}
+                            </TableCell>
+                             <TableCell>
+                                {editingAgent === item.agentName ? (
+                                    <Input type="number" value={editedData.totalWithdrawals} onChange={e => handleInputChange(e, 'totalWithdrawals')} className="w-32" />
+                                ) : `$${item.totalWithdrawals.toFixed(2)}`}
+                            </TableCell>
+                            <TableCell>{item.lastEditedBy}</TableCell>
+                            <TableCell>
+                                {editingAgent === item.agentName ? (
+                                    <div className="flex items-center gap-2">
+                                        <Button size="sm" onClick={() => handleSave(item.agentName)}><Save className="h-4 w-4" /></Button>
+                                        <Button size="sm" variant="ghost" onClick={handleCancelEdit}><X className="h-4 w-4" /></Button>
+                                    </div>
+                                ) : (
+                                    <Button size="sm" variant="outline" onClick={() => handleEdit(item.agentName)}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+                                )}
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                    </TableBody>
+                </Table>
+                </div>
+            ) : (
+                <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[40vh] mt-4">
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold tracking-tight text-foreground">No Team Data Available</h2>
+                    <p className="text-muted-foreground mt-2">Register agents and add client data to see performance metrics.</p>
+                </div>
+                </div>
+            )}
+        </TabsContent>
         <TabsContent value="absences">
           <div className="flex justify-end mt-4">
             <Dialog open={absenceDialogOpen} onOpenChange={setAbsenceDialogOpen}>
