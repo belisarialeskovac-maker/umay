@@ -189,109 +189,113 @@ export default function DailyAddedPage() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
-            <h2 className="text-xl font-semibold mb-4 flex items-center"><TextSearch className="mr-2 h-5 w-5" /> Parsing Area</h2>
-            <div className='space-y-4'>
+        <Form {...form}>
+            <div className="space-y-8">
                 <div>
-                    <FormLabel htmlFor="pasted-details">Paste Client Details Here</FormLabel>
-                    <Textarea 
-                        id="pasted-details"
-                        placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE"
-                        className='min-h-[150px] mt-2'
-                        value={pastedDetails}
-                        onChange={(e) => setPastedDetails(e.target.value)}
-                        onPaste={handlePaste}
-                    />
-                     <p className="text-xs text-muted-foreground mt-2">Details will be automatically parsed and populated into the form below.</p>
+                    <h2 className="text-xl font-semibold mb-4 flex items-center"><TextSearch className="mr-2 h-5 w-5" /> Parsing Area</h2>
+                    <div className='space-y-4'>
+                        <div>
+                            <FormLabel htmlFor="pasted-details">Paste Client Details Here</FormLabel>
+                            <Textarea 
+                                id="pasted-details"
+                                placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE"
+                                className='min-h-[150px] mt-2'
+                                value={pastedDetails}
+                                onChange={(e) => setPastedDetails(e.target.value)}
+                                onPaste={handlePaste}
+                            />
+                             <p className="text-xs text-muted-foreground mt-2">Details will be automatically parsed and populated into the form below.</p>
+                        </div>
+                        <Button onClick={() => parseDetails(pastedDetails)} className='w-full'>
+                            <TextSearch className="mr-2 h-4 w-4" /> Parse Details
+                        </Button>
+                    </div>
                 </div>
-                <Button onClick={() => parseDetails(pastedDetails)} className='w-full'>
-                    <TextSearch className="mr-2 h-4 w-4" /> Parse Details
-                </Button>
+                
+                <div>
+                    <h2 className="text-xl font-semibold mb-4">Client Form</h2>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Name</FormLabel>
+                            <FormControl>
+                                <Input placeholder="John Doe" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="age"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Age</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="40" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="location"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Location</FormLabel>
+                            <FormControl>
+                                <Input placeholder="UAE" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="work"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Work</FormLabel>
+                            <FormControl>
+                                <Input placeholder="Captain in a cruise ship" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="assignedAgent"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Assigned Agent</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select an agent" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                {registeredAgents.map((agent) => (
+                                    <SelectItem key={agent.name} value={agent.name}>
+                                    {agent.name}
+                                    </SelectItem>
+                                ))}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <Button type="submit" className='w-full'>Add Client to Table</Button>
+                    </form>
+                </div>
             </div>
-            
-            <h2 className="text-xl font-semibold mt-8 mb-4">Client Form</h2>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="age"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Age</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="40" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="location"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <FormControl>
-                        <Input placeholder="UAE" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="work"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Work</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Captain in a cruise ship" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="assignedAgent"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Assigned Agent</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select an agent" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {registeredAgents.map((agent) => (
-                            <SelectItem key={agent.name} value={agent.name}>
-                              {agent.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className='w-full'>Add Client to Table</Button>
-              </form>
-            </Form>
-        </div>
+        </Form>
         
         <div>
             <h2 className="text-xl font-semibold mb-4">Today's Clients</h2>
