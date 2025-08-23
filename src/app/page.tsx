@@ -10,7 +10,7 @@ export default function Home() {
       <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] p-6">
         <div className="text-center">
           <h2 className="text-2xl font-bold tracking-tight text-foreground">
-            Welcome to CollaBoard
+            Welcome to your Dashboard
           </h2>
           <p className="text-muted-foreground mt-2">
             Select a page from the sidebar to view its content.

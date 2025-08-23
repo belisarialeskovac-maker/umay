@@ -33,8 +33,8 @@ import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'CollaBoard',
-  description: 'A modern collaborative dashboard.',
+  title: 'Dashboard',
+  description: 'A modern dashboard.',
 };
 
 const navItems = [
@@ -80,7 +80,7 @@ export default function RootLayout({
                     <rect width="7" height="9" x="14" y="12" rx="1"></rect>
                     <rect width="7" height="5" x="3" y="16" rx="1"></rect>
                  </svg>
-                <h1 className="text-xl font-semibold text-foreground">CollaBoard</h1>
+                <h1 className="text-xl font-semibold text-foreground group-data-[collapsible=icon]:hidden">Dashboard</h1>
               </div>
             </SidebarHeader>
             <SidebarContent>
