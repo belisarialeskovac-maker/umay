@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -85,26 +85,12 @@ export default function DailyAddedPage() {
     },
   });
 
-  useEffect(() => {
-    const storedAgents = localStorage.getItem("agents");
-    if (storedAgents) {
-      const parsedAgents = JSON.parse(storedAgents).map((agent: any) => ({
-        ...agent,
-        dateHired: new Date(agent.dateHired),
-      }));
-      setRegisteredAgents(parsedAgents);
-    }
-    
-    // Initial load and calculation of stats
-    calculateStats();
-  }, []);
-
-  const calculateStats = () => {
+  const calculateStats = useCallback(() => {
     const allDailyClients: Client[] = JSON.parse(localStorage.getItem('dailyAddedClients') || '[]').map((c: any) => ({...c, date: new Date(c.date)}));
-    const today = startOfToday();
+    const currentAgents: Agent[] = JSON.parse(localStorage.getItem('agents') || '[]').map((a: any) => ({...a, dateHired: new Date(a.dateHired)}));
 
-    const daily = allDailyClients.filter(c => isToday(c.date));
-    const monthly = allDailyClients.filter(c => isThisMonth(c.date));
+    const daily = allDailyClients.filter(c => isToday(new Date(c.date)));
+    const monthly = allDailyClients.filter(c => isThisMonth(new Date(c.date)));
 
     setDailyCount(daily.length);
     setMonthlyCount(monthly.length);
@@ -112,8 +98,8 @@ export default function DailyAddedPage() {
 
     const stats: AgentStats = {};
 
-    registeredAgents.forEach(agent => {
-        stats[agent.name] = { daily: 0, monthly: 0};
+    currentAgents.forEach(agent => {
+        stats[agent.name] = { daily: 0, monthly: 0 };
     });
 
     daily.forEach(client => {
@@ -129,7 +115,21 @@ export default function DailyAddedPage() {
     });
 
     setAgentStats(stats);
-  }
+  }, []);
+
+  useEffect(() => {
+    const storedAgents = localStorage.getItem("agents");
+    if (storedAgents) {
+      const parsedAgents = JSON.parse(storedAgents).map((agent: any) => ({
+        ...agent,
+        dateHired: new Date(agent.dateHired),
+      }));
+      setRegisteredAgents(parsedAgents);
+    }
+    
+    calculateStats();
+  }, [calculateStats]);
+
 
   const handleAddClient = () => {
     const agentValue = form.getValues('assignedAgent');
