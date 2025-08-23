@@ -36,7 +36,7 @@ import { Button } from '@/components/ui/button';
 const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '#', icon: Video, label: 'Videocall Template' },
-  { href: '#', icon: Users, label: 'Client Details' },
+  { href: '/client-details', icon: Users, label: 'Client Details' },
   { href: '#', icon: ClipboardList, label: 'Order Request' },
   { href: '#', icon: ArrowDownToLine, label: 'Deposit' },
   { href: '#', icon: ArrowUpFromLine, label: 'Withdrawal' },
