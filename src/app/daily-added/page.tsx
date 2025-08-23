@@ -110,13 +110,29 @@ export default function DailyAddedPage() {
         const locMatch = pastedDetails.match(locRegex);
         const workMatch = pastedDetails.match(workRegex);
 
-        const name = nameMatch ? nameMatch[1].trim() : 'N/A';
-        const age = ageMatch ? parseInt(ageMatch[1], 10) : 0;
-        const location = locMatch ? locMatch[1].trim() : 'N/A';
-        const work = workMatch ? workMatch[1].trim() : 'N/A';
+        let name: string, age: number, location: string, work: string;
 
-        if (name === 'N/A' && age === 0 && location === 'N/A' && work === 'N/A') {
-            throw new Error("Could not parse any details. Please check the format.");
+        if (nameMatch || ageMatch || locMatch || workMatch) {
+            // Labeled format parsing
+            name = nameMatch ? nameMatch[1].trim() : 'N/A';
+            age = ageMatch ? parseInt(ageMatch[1], 10) : 0;
+            location = locMatch ? locMatch[1].trim() : 'N/A';
+            work = workMatch ? workMatch[1].trim() : 'N/A';
+        } else {
+            // Label-less format parsing
+            const lines = pastedDetails.split('\n').map(line => line.trim()).filter(line => line);
+            if (lines.length >= 4) {
+                name = lines[0];
+                age = parseInt(lines[1], 10) || 0;
+                work = lines[2];
+                location = lines[3];
+            } else {
+                 throw new Error("Could not parse details. Please ensure the pasted text is in a supported format.");
+            }
+        }
+        
+        if (!name || age === 0 || !location || !work) {
+            throw new Error("Could not parse all details. Please check the format.");
         }
 
         const newClient: Client = {
@@ -147,7 +163,7 @@ export default function DailyAddedPage() {
     } catch (error: any) {
         toast({
             title: 'Parsing Failed',
-            description: error.message || 'Please ensure the pasted text is in a supported format with labels like "Name:", "Age:", "Location:", "Work:".',
+            description: error.message || 'Please ensure the pasted text is in a supported format.',
             variant: 'destructive',
         });
     }
@@ -174,7 +190,7 @@ export default function DailyAddedPage() {
                             <FormLabel htmlFor="pasted-details">1. Paste Client Details Here</FormLabel>
                             <Textarea 
                                 id="pasted-details"
-                                placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE"
+                                placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE&#10;&#10;Or:&#10;Camible&#10;47&#10;LTO Public Servant&#10;Benguet"
                                 className='min-h-[150px] mt-2'
                                 value={pastedDetails}
                                 onChange={(e) => setPastedDetails(e.target.value)}
