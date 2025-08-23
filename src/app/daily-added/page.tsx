@@ -103,41 +103,61 @@ export default function DailyAddedPage() {
         return;
     }
     try {
-      const lines = text.split('\n').filter(line => line.trim() !== '');
-      const details: Partial<ClientForm> = {};
-      
-      lines.forEach(line => {
-        const [rawKey, ...valueParts] = line.split(':');
-        const key = rawKey.trim().toLowerCase();
-        const value = valueParts.join(':').trim();
+        const details: Partial<ClientForm> = {};
 
-        if (key.includes('name')) details.name = value;
-        else if (key.includes('age')) details.age = parseInt(value.match(/\d+/)?.[0] || '0', 10);
-        else if (key.includes('loc')) details.location = value;
-        else if (key.includes('work') || key.includes('occupation')) details.work = value;
-      });
+        const nameRegex = /(?:client name|name):\s*(.*)/i;
+        const ageRegex = /age:\s*(\d+)/i;
+        const locRegex = /(?:loc|location):\s*(.*)/i;
+        const workRegex = /(?:work|occupation):\s*(.*)/i;
 
-      if (!details.name || !details.age || !details.location || !details.work) {
-        throw new Error("Could not parse all required fields. Please check the format.");
-      }
+        const lines = text.split('\n');
+        let parsedName, parsedAge, parsedLocation, parsedWork;
 
-      form.reset({
-        name: details.name || '',
-        age: details.age || undefined,
-        location: details.location || '',
-        work: details.work || '',
-        assignedAgent: form.getValues('assignedAgent'),
-      });
+        lines.forEach(line => {
+            if (!parsedName) {
+                const nameMatch = line.match(nameRegex);
+                if (nameMatch) parsedName = nameMatch[1].trim();
+            }
+            if (!parsedAge) {
+                const ageMatch = line.match(ageRegex);
+                if (ageMatch) parsedAge = parseInt(ageMatch[1], 10);
+            }
+            if (!parsedLocation) {
+                const locMatch = line.match(locRegex);
+                if (locMatch) parsedLocation = locMatch[1].trim();
+            }
+            if (!parsedWork) {
+                const workMatch = line.match(workRegex);
+                if (workMatch) parsedWork = workMatch[1].trim();
+            }
+        });
 
-      toast({
-        title: 'Details Parsed',
-        description: 'Client details have been populated in the form.',
-      });
+        details.name = parsedName;
+        details.age = parsedAge;
+        details.location = parsedLocation;
+        details.work = parsedWork;
+        
+        if (!details.name && !details.age && !details.location && !details.work) {
+            throw new Error("Could not parse details. Please check the format.");
+        }
+        
+        form.reset({
+            name: details.name || '',
+            age: details.age || undefined,
+            location: details.location || '',
+            work: details.work || '',
+            assignedAgent: form.getValues('assignedAgent'),
+        });
+
+        toast({
+            title: 'Details Parsed',
+            description: 'Client details have been populated in the form.',
+        });
 
     } catch (error: any) {
         toast({
             title: 'Parsing Failed',
-            description: error.message || 'Please ensure the pasted text is in the correct format.',
+            description: error.message || 'Please ensure the pasted text is in the correct format with labels like "Name:", "Age:", "Location:", "Work:".',
             variant: 'destructive',
         });
     }
@@ -153,7 +173,7 @@ export default function DailyAddedPage() {
       title: 'Client Added',
       description: `${values.name} has been successfully added to the list.`,
     });
-    form.reset();
+    form.reset({ name: "", age: undefined, location: "", work: "", assignedAgent: "" });
     setPastedDetails('');
   }
 
@@ -212,7 +232,7 @@ export default function DailyAddedPage() {
                     <FormItem>
                       <FormLabel>Age</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="40" {...field} />
+                        <Input type="number" placeholder="40" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -319,5 +339,3 @@ export default function DailyAddedPage() {
     </div>
   );
 }
-
-    
