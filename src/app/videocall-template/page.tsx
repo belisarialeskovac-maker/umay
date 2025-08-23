@@ -3,7 +3,7 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { jsPDF } from "jspdf"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -138,13 +138,8 @@ const requiredFields: (keyof FormData)[] = [
 ]
 
 export default function VideoCallTemplatePage() {
-  const [formData, setFormData] = useState<FormData>(() => {
-    if (typeof window !== "undefined") {
-      const savedData = localStorage.getItem("videoCallFormData")
-      return savedData ? JSON.parse(savedData) : initialFormData
-    }
-    return initialFormData
-  })
+  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [isMounted, setIsMounted] = useState(false);
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     model: true,
@@ -185,11 +180,18 @@ export default function VideoCallTemplatePage() {
   ]
 
   useEffect(() => {
-    updateProgress()
-    localStorage.setItem("videoCallFormData", JSON.stringify(formData))
-  }, [formData, isAuthenticityCall])
+    setIsMounted(true);
+    try {
+        const savedData = localStorage.getItem("videoCallFormData");
+        if (savedData) {
+            setFormData(JSON.parse(savedData));
+        }
+    } catch (error) {
+        console.error("Failed to parse form data from localStorage", error);
+    }
+  }, []);
 
-  const getFieldsToCheck = () => {
+  const getFieldsToCheck = useCallback(() => {
     let fieldsToCheck: (keyof FormData)[] = [...requiredFields]
     if (isAuthenticityCall) {
       const modelOptional = sections.find(s => s.id === 'model')?.optionalFields ?? [];
@@ -198,14 +200,21 @@ export default function VideoCallTemplatePage() {
       fieldsToCheck = fieldsToCheck.filter(f => !optionalFieldsToExclude.includes(f));
     }
     return fieldsToCheck;
-  }
+  }, [isAuthenticityCall, sections]);
   
-  const updateProgress = () => {
+  const updateProgress = useCallback(() => {
     const fieldsToCheck = getFieldsToCheck();
     const totalFields = fieldsToCheck.length
     const filledFields = fieldsToCheck.filter((field) => formData[field as keyof FormData]?.trim() !== "").length
     setProgress(totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0);
-  }
+  }, [formData, getFieldsToCheck]);
+
+  useEffect(() => {
+    if (isMounted) {
+        updateProgress();
+        localStorage.setItem("videoCallFormData", JSON.stringify(formData));
+    }
+  }, [formData, isMounted, updateProgress]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -344,7 +353,7 @@ export default function VideoCallTemplatePage() {
         !isAuthenticityCall && { label: "Relationship Status:", value: formData["divorce"] || "N/A" },
         !isAuthenticityCall && { label: "Pet Details:", value: formData["pet"] || "N/A" },
         { label: "Children Details:", value: formData["kids"] || "N/A" },
-        !isAuthenticityCall && { label: "Weather and Time:", value: formData["weather"] || "N/A" },
+        !isAuthenticityCall && { label: "Current Weather & Time:", value: formData["weather"] || "N/A" },
         !isAuthenticityCall && { label: "Parent Details:", value: formData["parents"] || "N/A" },
         !isAuthenticityCall && { label: "Weekend Plans:", value: formData["plans"] || "N/A" },
         !isAuthenticityCall && { label: "Ethnicity:", value: formData["ethnicity"] || "N/A" },
@@ -413,6 +422,7 @@ export default function VideoCallTemplatePage() {
     tooltip = "",
     hideForAuthenticity = false,
   ) => {
+    if (!isMounted) return null; // Don't render on the server
     const isCompleted = formData[name]?.trim() !== ""
     if (isAuthenticityCall && hideForAuthenticity) return null
 
@@ -452,6 +462,7 @@ export default function VideoCallTemplatePage() {
     placeholder = "",
     helpText = "",
   ) => {
+    if (!isMounted) return null; // Don't render on the server
     return(
         <div className="space-y-2 md:col-span-2">
             <label htmlFor="remarks" className="text-sm font-medium flex items-center gap-1">
@@ -465,6 +476,10 @@ export default function VideoCallTemplatePage() {
             {helpText && <p className="text-xs text-muted-foreground">{helpText}</p>}
         </div>
     )
+  }
+  
+  if (!isMounted) {
+    return null; // Or a loading spinner
   }
 
   return (
@@ -657,3 +672,5 @@ export default function VideoCallTemplatePage() {
     </div>
   )
 }
+
+    
