@@ -49,6 +49,7 @@ import {
   History,
   Mountain as Hiking,
   CloudRain,
+  Sparkles,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -212,6 +213,17 @@ export default function VideoCallTemplatePage() {
       ...prev,
       [name]: value,
     }))
+  }
+
+  const setAuthenticityPurpose = () => {
+    setFormData((prev) => ({
+      ...prev,
+      purpose: "Authenticity",
+    }));
+    toast({
+        title: "Purpose Updated",
+        description: "The purpose of the call has been set to 'Authenticity'.",
+    })
   }
 
   const isSectionComplete = (sectionId: string) => {
@@ -506,7 +518,16 @@ export default function VideoCallTemplatePage() {
                     {expandedSections.model && (
                         <CardContent className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {renderFormField("purpose", "Purpose of Call", <Target className="h-4 w-4" />, true, "E.g., Authenticity")}
+                            <div className="md:col-span-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                                    <div className="sm:col-span-2">
+                                        {renderFormField("purpose", "Purpose of Call", <Target className="h-4 w-4" />, true, "E.g., Authenticity")}
+                                    </div>
+                                    <Button onClick={setAuthenticityPurpose} variant="outline" className="w-full sm:w-auto">
+                                        <Sparkles className="mr-2 h-4 w-4" /> Authenticity
+                                    </Button>
+                                </div>
+                            </div>
                             {renderFormField("fullName", "Full Name / Age", <User className="h-4 w-4" />, true, "E.g., Jane Smith / 30", "Format: Name / Age")}
                             {renderFormField("location", "Current Location", <MapPin className="h-4 w-4" />, true, "E.g., Makati (5 years)", "", "Include city/area and how many years you've lived there")}
                             {renderFormField("previousLocation", "Previous Location", <History className="h-4 w-4" />, false, "E.g., Manila", "", "", true)}
