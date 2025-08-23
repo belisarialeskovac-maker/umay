@@ -84,7 +84,9 @@ export default function DepositPage() {
       shopId: "",
       clientName: "",
       agent: "",
-      paymentMode: "Ewallet/Online Banking"
+      paymentMode: "Ewallet/Online Banking",
+      amount: 0,
+      date: new Date(),
     },
   })
 
@@ -315,5 +317,3 @@ export default function DepositPage() {
     </div>
   )
 }
-
-    
