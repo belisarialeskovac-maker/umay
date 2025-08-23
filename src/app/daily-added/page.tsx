@@ -113,15 +113,14 @@ export default function DailyAddedPage() {
         stats[agent.name] = { daily: 0, monthly: 0 };
     });
 
-    daily.forEach(client => {
+    allDailyClients.forEach(client => {
         if(stats[client.assignedAgent]) {
-            stats[client.assignedAgent].daily++;
-        }
-    });
-
-    monthly.forEach(client => {
-        if(stats[client.assignedAgent]) {
-            stats[client.assignedAgent].monthly++;
+            if (isToday(new Date(client.date))) {
+                stats[client.assignedAgent].daily++;
+            }
+            if (isThisMonth(new Date(client.date))) {
+                stats[client.assignedAgent].monthly++;
+            }
         }
     });
 
@@ -304,22 +303,23 @@ export default function DailyAddedPage() {
                         <p className="text-xs text-muted-foreground">All-time client count</p>
                     </CardContent>
                 </Card>
-                <Card className="md:col-span-2 lg:col-span-1">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Agent Performance</CardTitle>
-                        <UserCheckIcon className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent className='text-sm'>
-                       <div className="space-y-2">
-                         {Object.keys(agentStats).length > 0 ? Object.entries(agentStats).map(([agent, stats]) => (
-                           <div key={agent} className="flex justify-between">
-                             <span className="font-medium">{agent}</span>
-                             <span className="text-muted-foreground">D: {stats.daily} | M: {stats.monthly}</span>
-                           </div>
-                         )) : <p className="text-muted-foreground text-xs">No agent activity yet.</p>}
-                       </div>
-                    </CardContent>
-                </Card>
+            </div>
+             <h2 className="text-xl font-semibold my-4 flex items-center"><UserCheckIcon className="mr-2 h-5 w-5" /> Agent Performance</h2>
+             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {Object.keys(agentStats).length > 0 ? Object.entries(agentStats).map(([agent, stats]) => (
+                    <Card key={agent}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">{agent}</CardTitle>
+                            <UserCheckIcon className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{stats.daily}</div>
+                            <p className="text-xs text-muted-foreground">Daily Clients</p>
+                             <div className="text-2xl font-bold mt-2">{stats.monthly}</div>
+                            <p className="text-xs text-muted-foreground">Monthly Clients</p>
+                        </CardContent>
+                    </Card>
+                )) : <p className="text-muted-foreground text-sm col-span-full">No agent activity yet. Register agents and add clients to see performance.</p>}
             </div>
         </div>
 
