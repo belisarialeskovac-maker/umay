@@ -17,7 +17,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -46,16 +45,17 @@ const agentSchema = z.object({
 type Agent = z.infer<typeof agentSchema>;
 
 const clientFormSchema = z.object({
-  name: z.string().min(1, "Name is required."),
-  age: z.coerce.number().positive("Age must be a positive number."),
-  location: z.string().min(1, "Location is required."),
-  work: z.string().min(1, "Work is required."),
-  assignedAgent: z.string().min(1, "An agent must be selected."),
+    assignedAgent: z.string().min(1, "An agent must be selected."),
 });
 
 type ClientForm = z.infer<typeof clientFormSchema>;
 
-type Client = ClientForm & {
+type Client = {
+    name: string;
+    age: number;
+    location: string;
+    work: string;
+    assignedAgent: string;
     date: Date;
 };
 
@@ -68,10 +68,6 @@ export default function DailyAddedPage() {
   const form = useForm<ClientForm>({
     resolver: zodResolver(clientFormSchema),
     defaultValues: {
-        name: "",
-        age: undefined,
-        location: "",
-        work: "",
         assignedAgent: "",
     },
   });
@@ -87,14 +83,14 @@ export default function DailyAddedPage() {
     }
   }, []);
 
-  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const text = event.clipboardData.getData('text');
-    setPastedDetails(text);
-    parseDetails(text);
-  };
+  const handleAddClient = () => {
+    const agentValue = form.getValues('assignedAgent');
+    if (!agentValue) {
+        form.setError("assignedAgent", { type: "manual", message: "Please select an agent."});
+        return;
+    }
 
-  const parseDetails = (text: string) => {
-    if (!text) {
+    if (!pastedDetails) {
         toast({
             title: 'No details provided',
             description: 'Please paste the client details into the text area.',
@@ -102,57 +98,43 @@ export default function DailyAddedPage() {
         });
         return;
     }
+    
     try {
-        const details: Partial<ClientForm> = {};
-
         const nameRegex = /(?:client name|name):\s*(.*)/i;
         const ageRegex = /age:\s*(\d+)/i;
         const locRegex = /(?:loc|location):\s*(.*)/i;
         const workRegex = /(?:work|occupation):\s*(.*)/i;
 
-        const lines = text.split('\n');
-        let parsedName, parsedAge, parsedLocation, parsedWork;
+        const nameMatch = pastedDetails.match(nameRegex);
+        const ageMatch = pastedDetails.match(ageRegex);
+        const locMatch = pastedDetails.match(locRegex);
+        const workMatch = pastedDetails.match(workRegex);
 
-        lines.forEach(line => {
-            if (!parsedName) {
-                const nameMatch = line.match(nameRegex);
-                if (nameMatch) parsedName = nameMatch[1].trim();
-            }
-            if (!parsedAge) {
-                const ageMatch = line.match(ageRegex);
-                if (ageMatch) parsedAge = parseInt(ageMatch[1], 10);
-            }
-            if (!parsedLocation) {
-                const locMatch = line.match(locRegex);
-                if (locMatch) parsedLocation = locMatch[1].trim();
-            }
-            if (!parsedWork) {
-                const workMatch = line.match(workRegex);
-                if (workMatch) parsedWork = workMatch[1].trim();
-            }
-        });
+        const name = nameMatch ? nameMatch[1].trim() : '';
+        const age = ageMatch ? parseInt(ageMatch[1], 10) : 0;
+        const location = locMatch ? locMatch[1].trim() : '';
+        const work = workMatch ? workMatch[1].trim() : '';
 
-        details.name = parsedName;
-        details.age = parsedAge;
-        details.location = parsedLocation;
-        details.work = parsedWork;
-        
-        if (!details.name && !details.age && !details.location && !details.work) {
-            throw new Error("Could not parse details. Please check the format.");
+        if (!name || !age || !location || !work) {
+            throw new Error("Could not parse all details. Please check the format.");
         }
-        
-        form.reset({
-            name: details.name || '',
-            age: details.age || undefined,
-            location: details.location || '',
-            work: details.work || '',
-            assignedAgent: form.getValues('assignedAgent'),
-        });
 
+        const newClient: Client = {
+          name,
+          age,
+          location,
+          work,
+          assignedAgent: agentValue,
+          date: new Date(),
+        };
+
+        setClients((prevClients) => [...prevClients, newClient]);
         toast({
-            title: 'Details Parsed',
-            description: 'Client details have been populated in the form.',
+          title: 'Client Added',
+          description: `${name} has been successfully added to the list.`,
         });
+        form.reset({ assignedAgent: "" });
+        setPastedDetails('');
 
     } catch (error: any) {
         toast({
@@ -161,20 +143,6 @@ export default function DailyAddedPage() {
             variant: 'destructive',
         });
     }
-  }
-
-  function onSubmit(values: ClientForm) {
-    const newClient: Client = {
-      ...values,
-      date: new Date(),
-    };
-    setClients((prevClients) => [...prevClients, newClient]);
-    toast({
-      title: 'Client Added',
-      description: `${values.name} has been successfully added to the list.`,
-    });
-    form.reset({ name: "", age: undefined, location: "", work: "", assignedAgent: "" });
-    setPastedDetails('');
   }
 
   return (
@@ -189,113 +157,54 @@ export default function DailyAddedPage() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <Form {...form}>
-            <div className="space-y-8">
-                <div>
-                    <h2 className="text-xl font-semibold mb-4 flex items-center"><TextSearch className="mr-2 h-5 w-5" /> Parsing Area</h2>
-                    <div className='space-y-4'>
-                        <div>
-                            <FormLabel htmlFor="pasted-details">Paste Client Details Here</FormLabel>
-                            <Textarea 
-                                id="pasted-details"
-                                placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE"
-                                className='min-h-[150px] mt-2'
-                                value={pastedDetails}
-                                onChange={(e) => setPastedDetails(e.target.value)}
-                                onPaste={handlePaste}
-                            />
-                             <p className="text-xs text-muted-foreground mt-2">Details will be automatically parsed and populated into the form below.</p>
-                        </div>
-                        <Button onClick={() => parseDetails(pastedDetails)} className='w-full'>
-                            <TextSearch className="mr-2 h-4 w-4" /> Parse Details
-                        </Button>
+        <div className="space-y-8">
+            <div>
+                <h2 className="text-xl font-semibold mb-4 flex items-center"><TextSearch className="mr-2 h-5 w-5" /> Parsing Area</h2>
+                <div className='space-y-4'>
+                    <div>
+                        <FormLabel htmlFor="pasted-details">1. Paste Client Details Here</FormLabel>
+                        <Textarea 
+                            id="pasted-details"
+                            placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE"
+                            className='min-h-[150px] mt-2'
+                            value={pastedDetails}
+                            onChange={(e) => setPastedDetails(e.target.value)}
+                        />
                     </div>
-                </div>
-                
-                <div>
-                    <h2 className="text-xl font-semibold mb-4">Client Form</h2>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Name</FormLabel>
-                            <FormControl>
-                                <Input placeholder="John Doe" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="age"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Age</FormLabel>
-                            <FormControl>
-                                <Input type="number" placeholder="40" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="location"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Location</FormLabel>
-                            <FormControl>
-                                <Input placeholder="UAE" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="work"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Work</FormLabel>
-                            <FormControl>
-                                <Input placeholder="Captain in a cruise ship" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="assignedAgent"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Assigned Agent</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select an agent" />
-                                </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                {registeredAgents.map((agent) => (
-                                    <SelectItem key={agent.name} value={agent.name}>
-                                    {agent.name}
-                                    </SelectItem>
-                                ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <Button type="submit" className='w-full'>Add Client to Table</Button>
-                    </form>
+                    <Form {...form}>
+                        <form className="space-y-4">
+                            <FormField
+                                control={form.control}
+                                name="assignedAgent"
+                                render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>2. Select Assigned Agent</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select an agent" />
+                                        </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                        {registeredAgents.map((agent) => (
+                                            <SelectItem key={agent.name} value={agent.name}>
+                                            {agent.name}
+                                            </SelectItem>
+                                        ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </form>
+                    </Form>
+                     <Button onClick={handleAddClient} className='w-full'>
+                        <UserPlus className="mr-2 h-4 w-4" /> 3. Parse and Add Client
+                    </Button>
                 </div>
             </div>
-        </Form>
+        </div>
         
         <div>
             <h2 className="text-xl font-semibold mb-4">Today's Clients</h2>
