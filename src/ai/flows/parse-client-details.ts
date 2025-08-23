@@ -121,6 +121,19 @@ Output:
     "location": "Davao"
 }
 ---
+Input:
+Name: rommel sandigan
+Age: 49
+Location: Caloocan City, Philippines
+Work: Local inter island vessel radio operator
+Output:
+{
+  "clientName": "rommel sandigan",
+  "age": 49,
+  "location": "Caloocan City, Philippines",
+  "work": "Local inter island vessel radio operator"
+}
+---
 `,
 });
 
