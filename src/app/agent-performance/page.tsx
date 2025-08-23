@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -46,6 +46,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 
 const agentTypes = ["Regular", "Elite", "Spammer", "Model", "Team Leader"] as const
 
@@ -64,10 +67,60 @@ const formSchema = z.object({
 
 type Agent = z.infer<typeof formSchema>
 
+// Data types from other pages
+type Client = {
+    shopId: string;
+    clientName: string;
+    agent: string;
+    kycCompletedDate: Date;
+    status: "In Process" | "Active" | "Eliminated";
+    clientDetails: string;
+}
+type Transaction = {
+    shopId: string;
+    clientName: string;
+    agent: string;
+    date: Date;
+    amount: number;
+    paymentMode: string;
+}
+type Inventory = {
+    id: string;
+    agent: string;
+    imei: string;
+    model: string;
+    color: string;
+    appleIdUsername?: string;
+    appleIdPassword?: string;
+    remarks?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+type Order = {
+    id: number;
+    agent: string;
+    shopId: string;
+    location: string;
+    price: number;
+    remarks: string;
+    status: "Pending" | "Approved" | "Rejected";
+}
+
+
 export default function AgentPerformancePage() {
   const [open, setOpen] = useState(false)
   const [agents, setAgents] = useState<Agent[]>([])
   const { toast } = useToast()
+  
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  
+  // States for agent-related data
+  const [agentClients, setAgentClients] = useState<Client[]>([]);
+  const [agentDeposits, setAgentDeposits] = useState<Transaction[]>([]);
+  const [agentWithdrawals, setAgentWithdrawals] = useState<Transaction[]>([]);
+  const [agentInventory, setAgentInventory] = useState<Inventory[]>([]);
+  const [agentOrders, setAgentOrders] = useState<Order[]>([]);
+
 
   const form = useForm<Agent>({
     resolver: zodResolver(formSchema),
@@ -80,7 +133,6 @@ export default function AgentPerformancePage() {
   useEffect(() => {
     const storedAgents = localStorage.getItem("agents");
     if (storedAgents) {
-      // The stored dates are strings, so we need to convert them back to Date objects
       const parsedAgents = JSON.parse(storedAgents).map((agent: any) => ({
         ...agent,
         dateHired: new Date(agent.dateHired),
@@ -88,6 +140,24 @@ export default function AgentPerformancePage() {
       setAgents(parsedAgents);
     }
   }, []);
+  
+  useEffect(() => {
+    if (selectedAgent) {
+        // Load all data from localStorage and filter for the selected agent
+        const allClients: Client[] = JSON.parse(localStorage.getItem('clients') || '[]').map((c:any) => ({...c, kycCompletedDate: new Date(c.kycCompletedDate)}));
+        const allDeposits: Transaction[] = JSON.parse(localStorage.getItem('deposits') || '[]').map((d:any) => ({...d, date: new Date(d.date)}));
+        const allWithdrawals: Transaction[] = JSON.parse(localStorage.getItem('withdrawals') || '[]').map((w:any) => ({...w, date: new Date(w.date)}));
+        const allInventory: Inventory[] = JSON.parse(localStorage.getItem('inventory') || '[]');
+        const allOrders: Order[] = JSON.parse(localStorage.getItem('orders') || '[]');
+
+        setAgentClients(allClients.filter(c => c.agent === selectedAgent.name));
+        setAgentDeposits(allDeposits.filter(d => d.agent === selectedAgent.name));
+        setAgentWithdrawals(allWithdrawals.filter(w => w.agent === selectedAgent.name));
+        setAgentInventory(allInventory.filter(i => i.agent === selectedAgent.name));
+        setAgentOrders(allOrders.filter(o => o.agent === selectedAgent.name));
+    }
+  }, [selectedAgent]);
+
 
   function onSubmit(values: Agent) {
     const updatedAgents = [...agents, values]
@@ -100,6 +170,14 @@ export default function AgentPerformancePage() {
     setOpen(false)
     form.reset()
   }
+  
+  const handleRowClick = (agent: Agent) => {
+    setSelectedAgent(agent);
+  }
+
+  const handleCloseDetails = () => {
+    setSelectedAgent(null);
+  }
 
   return (
     <div className="w-full h-full">
@@ -107,7 +185,7 @@ export default function AgentPerformancePage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Agent Performance</h1>
           <p className="text-muted-foreground mt-1">
-            Monitor and manage your agents.
+            Monitor and manage your agents. Click on an agent to view their details.
           </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -222,7 +300,109 @@ export default function AgentPerformancePage() {
           </DialogContent>
         </Dialog>
       </div>
-      {agents.length > 0 ? (
+
+      {selectedAgent ? (
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle>Agent Details: {selectedAgent.name}</CardTitle>
+                        <CardDescription>
+                            Email: {selectedAgent.email} | Type: {selectedAgent.agentType} | Hired: {format(selectedAgent.dateHired, "PPP")}
+                        </CardDescription>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={handleCloseDetails}><X className="h-4 w-4" /></Button>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <Tabs defaultValue="overview">
+                    <TabsList>
+                        <TabsTrigger value="overview">Overview</TabsTrigger>
+                        <TabsTrigger value="clients">Clients</TabsTrigger>
+                        <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                        <TabsTrigger value="inventory">Inventory</TabsTrigger>
+                        <TabsTrigger value="orders">Orders</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="overview" className="pt-4">
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            <Card>
+                                <CardHeader><CardTitle>Clients</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold">{agentClients.length}</div></CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader><CardTitle>Total Deposits</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold">${agentDeposits.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}</div></CardContent>
+                            </Card>
+                             <Card>
+                                <CardHeader><CardTitle>Total Withdrawals</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold">${agentWithdrawals.reduce((sum, w) => sum + w.amount, 0).toFixed(2)}</div></CardContent>
+                            </Card>
+                             <Card>
+                                <CardHeader><CardTitle>Devices Held</CardTitle></CardHeader>
+                                <CardContent><div className="text-2xl font-bold">{agentInventory.length}</div></CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
+                    <TabsContent value="clients">
+                        <Table>
+                            <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client Name</TableHead><TableHead>KYC Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                            <TableBody>
+                                {agentClients.length > 0 ? agentClients.map(c => (
+                                    <TableRow key={c.shopId}><TableCell>{c.shopId}</TableCell><TableCell>{c.clientName}</TableCell><TableCell>{format(c.kycCompletedDate, "PPP")}</TableCell><TableCell><Badge variant={c.status === 'Active' ? 'default' : c.status === 'In Process' ? 'secondary' : 'destructive'}>{c.status}</Badge></TableCell></TableRow>
+                                )) : <TableRow><TableCell colSpan={4} className="text-center">No clients found for this agent.</TableCell></TableRow>}
+                            </TableBody>
+                        </Table>
+                    </TabsContent>
+                    <TabsContent value="transactions">
+                        <div className="grid gap-6 md:grid-cols-2">
+                            <div>
+                                <h3 className="text-lg font-medium mb-2">Deposits</h3>
+                                <Table>
+                                     <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead>Amount</TableHead></TableRow></TableHeader>
+                                     <TableBody>
+                                        {agentDeposits.length > 0 ? agentDeposits.map((d,i) => (
+                                            <TableRow key={`dep-${i}`}><TableCell>{d.shopId}</TableCell><TableCell>{d.clientName}</TableCell><TableCell>{format(d.date, "PPP")}</TableCell><TableCell>${d.amount.toFixed(2)}</TableCell></TableRow>
+                                        )) : <TableRow><TableCell colSpan={4} className="text-center">No deposits found.</TableCell></TableRow>}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-medium mb-2">Withdrawals</h3>
+                                <Table>
+                                     <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead>Amount</TableHead></TableRow></TableHeader>
+                                     <TableBody>
+                                        {agentWithdrawals.length > 0 ? agentWithdrawals.map((w,i) => (
+                                            <TableRow key={`wit-${i}`}><TableCell>{w.shopId}</TableCell><TableCell>{w.clientName}</TableCell><TableCell>{format(w.date, "PPP")}</TableCell><TableCell>${w.amount.toFixed(2)}</TableCell></TableRow>
+                                        )) : <TableRow><TableCell colSpan={4} className="text-center">No withdrawals found.</TableCell></TableRow>}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </div>
+                    </TabsContent>
+                    <TabsContent value="inventory">
+                         <Table>
+                            <TableHeader><TableRow><TableHead>IMEI</TableHead><TableHead>Model</TableHead><TableHead>Color</TableHead><TableHead>Last Updated</TableHead></TableRow></TableHeader>
+                            <TableBody>
+                                {agentInventory.length > 0 ? agentInventory.map(d => (
+                                    <TableRow key={d.id}><TableCell>{d.imei}</TableCell><TableCell>{d.model}</TableCell><TableCell>{d.color}</TableCell><TableCell>{format(new Date(d.updatedAt), "PPP p")}</TableCell></TableRow>
+                                )) : <TableRow><TableCell colSpan={4} className="text-center">No devices found for this agent.</TableCell></TableRow>}
+                            </TableBody>
+                        </Table>
+                    </TabsContent>
+                    <TabsContent value="orders">
+                         <Table>
+                            <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Location</TableHead><TableHead>Price</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                            <TableBody>
+                                {agentOrders.length > 0 ? agentOrders.map(o => (
+                                    <TableRow key={o.id}><TableCell>{o.shopId}</TableCell><TableCell>{o.location}</TableCell><TableCell>${o.price.toFixed(2)}</TableCell><TableCell><Badge variant={o.status === 'Approved' ? 'default' : o.status === 'Pending' ? 'secondary' : 'destructive'}>{o.status}</Badge></TableCell></TableRow>
+                                )) : <TableRow><TableCell colSpan={4} className="text-center">No orders found for this agent.</TableCell></TableRow>}
+                            </TableBody>
+                        </Table>
+                    </TabsContent>
+                </Tabs>
+            </CardContent>
+        </Card>
+      ) : agents.length > 0 ? (
         <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>
@@ -235,7 +415,7 @@ export default function AgentPerformancePage() {
             </TableHeader>
             <TableBody>
               {agents.map((agent, index) => (
-                <TableRow key={index}>
+                <TableRow key={index} onClick={() => handleRowClick(agent)} className="cursor-pointer">
                   <TableCell>{agent.name}</TableCell>
                   <TableCell>{agent.email}</TableCell>
                   <TableCell>{format(agent.dateHired, "PPP")}</TableCell>
@@ -260,3 +440,5 @@ export default function AgentPerformancePage() {
     </div>
   )
 }
+
+    
