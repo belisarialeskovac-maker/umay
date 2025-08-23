@@ -50,6 +50,8 @@ type DailyAddedClient = z.infer<typeof dailyAddedClientSchema>;
 const clientSchema = z.object({
   agent: z.string(),
   kycCompletedDate: z.date(),
+  shopId: z.string(),
+  clientName: z.string(),
 });
 type Client = z.infer<typeof clientSchema>;
 
@@ -122,6 +124,11 @@ export default function ReportingPage() {
     }
   }, []);
 
+  const agentClients = useMemo(() => {
+    if (!selectedAgent) return [];
+    return clients.filter(client => client.agent === selectedAgent);
+  }, [selectedAgent, clients]);
+  
   const agentStats = useMemo(() => {
     if (!selectedAgent) return {
       addedToday: 0,
@@ -391,7 +398,22 @@ export default function ReportingPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <Label htmlFor={`shopId-${client.id}`}>Shop ID</Label>
-                                    <Input id={`shopId-${client.id}`} value={client.shopId} onChange={(e) => handleClientInfoChange(client.id, 'shopId', e.target.value)} placeholder="Enter shop ID"/>
+                                    <Select 
+                                        value={client.shopId} 
+                                        onValueChange={(value) => handleClientInfoChange(client.id, 'shopId', value)}
+                                        disabled={!selectedAgent}
+                                    >
+                                        <SelectTrigger id={`shopId-${client.id}`}>
+                                            <SelectValue placeholder="Select a shop ID" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {agentClients.map(c => (
+                                                <SelectItem key={c.shopId} value={c.shopId}>
+                                                    {c.shopId} - ({c.clientName})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                                 <div>
                                     <Label htmlFor={`assets-${client.id}`}>Assets</Label>
@@ -455,5 +477,3 @@ export default function ReportingPage() {
     </div>
   )
 }
-
-    
