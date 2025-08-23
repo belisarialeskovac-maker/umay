@@ -291,58 +291,72 @@ export default function VideoCallTemplatePage() {
   }
 
   const generatePDF = () => {
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
-    let y = 15
-    const pageW = doc.internal.pageSize.width
-    const margin = 15
-    const contentW = pageW - margin * 2
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageW = doc.internal.pageSize.width;
+    const margin = 15;
+    const contentW = pageW - margin * 2;
+    const labelWidth = 60;
+    const valueWidth = contentW - labelWidth - 5;
+    let y = 15;
 
-    doc.setFontSize(18)
-    doc.setFont("helvetica", "bold")
-    doc.text("Video Call Details", pageW / 2, y, { align: "center" })
-    y += 10
+    const checkPageBreak = (heightNeeded: number) => {
+      if (y + heightNeeded > 280) {
+        doc.addPage();
+        y = 20;
+      }
+    };
     
-    const now = new Date()
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Video Call Details", pageW / 2, y, { align: "center" });
+    y += 8;
+    
+    const now = new Date();
     const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" };
-    const formattedDate = now.toLocaleDateString("en-US", options)
-    doc.setFontSize(9)
-    doc.setTextColor(150)
-    doc.text(`Generated on: ${formattedDate}`, pageW / 2, y, { align: "center" })
-    y += 15
+    const formattedDate = now.toLocaleDateString("en-US", options);
+    doc.setFontSize(9);
+    doc.setTextColor(150);
+    doc.text(`Generated on: ${formattedDate}`, pageW / 2, y, { align: "center" });
+    y += 15;
 
     const addSection = (title: string, data: { label: string; value: string }[]) => {
-      if (y > 260) doc.addPage();
-      doc.setFontSize(14)
-      doc.setFont("helvetica", "bold")
-      doc.text(title, margin, y)
-      y += 8
-      
-      doc.setDrawColor(230)
-      doc.line(margin, y - 2, margin + contentW, y - 2);
+      checkPageBreak(15);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(title, margin, y);
+      y += 2;
+      doc.setDrawColor(230);
+      doc.line(margin, y, margin + contentW, y);
+      y += 6;
 
       data.forEach(item => {
-          if (!item.value || item.value === "N/A") return;
+        if (!item.value || item.value === "N/A") return;
 
-          const labelLines = doc.splitTextToSize(item.label, 60);
-          const valueLines = doc.splitTextToSize(item.value, contentW - 70);
-          const lineHeight = Math.max(labelLines.length, valueLines.length) * 5 + 4;
-          if (y + lineHeight > 280) {
-              doc.addPage();
-              y = 20;
-          }
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "bold");
-          doc.text(item.label, margin, y + 5);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        const labelLines = doc.splitTextToSize(item.label, labelWidth);
+        
+        doc.setFont("helvetica", "normal");
+        const valueLines = doc.splitTextToSize(item.value, valueWidth);
+        
+        const lineHeight = Math.max(labelLines.length, valueLines.length) * 5;
+        checkPageBreak(lineHeight + 4);
 
-          doc.setFont("helvetica", "normal");
-          doc.text(valueLines, margin + 65, y + 5);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text(labelLines, margin, y);
 
-          y += lineHeight;
-          doc.setDrawColor(240);
-          doc.line(margin, y - 2, margin + contentW, y-2);
+        doc.setFont("helvetica", "normal");
+        doc.text(valueLines, margin + labelWidth + 5, y);
+
+        y += lineHeight;
+        y += 2;
+        doc.setDrawColor(245);
+        doc.line(margin, y, margin + contentW, y);
+        y+=2;
       });
-      y+= 5;
-    }
+      y += 5;
+    };
     
     const modelData = [
         { label: "Purpose of Call:", value: formData["purpose"] || "N/A" },
