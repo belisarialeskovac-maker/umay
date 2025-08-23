@@ -164,53 +164,51 @@ export default function DailyAddedPage() {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="space-y-8">
-            <div>
-                <h2 className="text-xl font-semibold mb-4 flex items-center"><TextSearch className="mr-2 h-5 w-5" /> Parsing Area</h2>
-                <div className='space-y-4'>
-                    <Form {...form}>
-                        <form className="space-y-4">
-                            <div>
-                                <FormLabel htmlFor="pasted-details">1. Paste Client Details Here</FormLabel>
-                                <Textarea 
-                                    id="pasted-details"
-                                    placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE"
-                                    className='min-h-[150px] mt-2'
-                                    value={pastedDetails}
-                                    onChange={(e) => setPastedDetails(e.target.value)}
-                                />
-                            </div>
-                            <FormField
-                                control={form.control}
-                                name="assignedAgent"
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>2. Select Assigned Agent</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value || ''}>
-                                        <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select an agent" />
-                                        </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                        {registeredAgents.map((agent) => (
-                                            <SelectItem key={agent.name} value={agent.name}>
-                                            {agent.name}
-                                            </SelectItem>
-                                        ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
+      <div className="space-y-8">
+        <div>
+            <h2 className="text-xl font-semibold mb-4 flex items-center"><TextSearch className="mr-2 h-5 w-5" /> Parsing Area</h2>
+            <div className='space-y-4'>
+                <Form {...form}>
+                    <form className="space-y-4">
+                        <div>
+                            <FormLabel htmlFor="pasted-details">1. Paste Client Details Here</FormLabel>
+                            <Textarea 
+                                id="pasted-details"
+                                placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE"
+                                className='min-h-[150px] mt-2'
+                                value={pastedDetails}
+                                onChange={(e) => setPastedDetails(e.target.value)}
                             />
-                        </form>
-                    </Form>
-                     <Button onClick={handleAddClient} className='w-full'>
-                        <UserPlus className="mr-2 h-4 w-4" /> 3. Parse and Add Client
-                    </Button>
-                </div>
+                        </div>
+                        <FormField
+                            control={form.control}
+                            name="assignedAgent"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>2. Select Assigned Agent</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value || ''}>
+                                    <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select an agent" />
+                                    </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                    {registeredAgents.map((agent) => (
+                                        <SelectItem key={agent.name} value={agent.name}>
+                                        {agent.name}
+                                        </SelectItem>
+                                    ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </form>
+                </Form>
+                 <Button onClick={handleAddClient} className='w-full'>
+                    <UserPlus className="mr-2 h-4 w-4" /> 3. Parse and Add Client
+                </Button>
             </div>
         </div>
         
@@ -244,7 +242,7 @@ export default function DailyAddedPage() {
                 </Table>
                 </div>
             ) : (
-                <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh]">
+                <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm min-h-[30vh]">
                 <div className="text-center">
                     <h2 className="text-2xl font-bold tracking-tight text-foreground">
                     No Clients Added Today
