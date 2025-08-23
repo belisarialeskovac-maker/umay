@@ -38,14 +38,14 @@ export const metadata: Metadata = {
 };
 
 const navItems = [
-  { href: '#', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '#', icon: Video, label: 'Videocall Template' },
   { href: '#', icon: Users, label: 'Client Details' },
   { href: '#', icon: ClipboardList, label: 'Order Request' },
   { href: '#', icon: ArrowDownToLine, label: 'Deposit' },
   { href: '#', icon: ArrowUpFromLine, label: 'Withdrawal' },
   { href: '#', icon: AreaChart, label: 'Team Performance' },
-  { href: '#', icon: UserCheck, label: 'Agent Performance' },
+  { href: '/agent-performance', icon: UserCheck, label: 'Agent Performance' },
   { href: '#', icon: FileText, label: 'Reporting' },
   { href: '#', icon: CalendarPlus, label: 'Daily Added' },
   { href: '#', icon: Megaphone, label: 'Announcement' },
@@ -77,7 +77,7 @@ export default function RootLayout({
                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-8 text-primary">
                     <rect width="7" height="9" x="3" y="3" rx="1"></rect>
                     <rect width="7" height="5" x="14" y="3" rx="1"></rect>
-                    <rect width="7" height="9" x="14" y="12" rx="1"></rect>
+                    <rect width="7" height="9" x="14" y="12"rx="1"></rect>
                     <rect width="7" height="5" x="3" y="16" rx="1"></rect>
                  </svg>
                 <h1 className="text-xl font-semibold text-foreground group-data-[collapsible=icon]:hidden">Dashboard</h1>
@@ -85,9 +85,9 @@ export default function RootLayout({
             </SidebarHeader>
             <SidebarContent>
               <SidebarMenu>
-                {navItems.map((item, index) => (
+                {navItems.map((item) => (
                   <SidebarMenuItem key={item.label}>
-                    <SidebarMenuButton tooltip={item.label} isActive={index === 0}>
+                    <SidebarMenuButton href={item.href} tooltip={item.label} isActive={item.href.startsWith('/agent-performance')}>
                       <item.icon />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
