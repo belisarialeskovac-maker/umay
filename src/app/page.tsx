@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
-import { format, getMonth, getYear, isWithinInterval, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, getMonth, getYear, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 
 type Client = {
   kycCompletedDate: Date;
