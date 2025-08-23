@@ -5,8 +5,8 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format } from 'date-fns';
-import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch } from 'lucide-react';
+import { format, isToday, isThisMonth, startOfToday } from 'date-fns';
+import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const agentSchema = z.object({
   name: z.string(),
@@ -59,11 +60,23 @@ type Client = {
     date: Date;
 };
 
+type AgentStats = {
+    [key: string]: {
+        daily: number;
+        monthly: number;
+    }
+}
+
 export default function DailyAddedPage() {
   const [sessionClients, setSessionClients] = useState<Client[]>([]);
   const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([]);
   const [pastedDetails, setPastedDetails] = useState('');
   const { toast } = useToast();
+
+  const [dailyCount, setDailyCount] = useState(0);
+  const [monthlyCount, setMonthlyCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [agentStats, setAgentStats] = useState<AgentStats>({});
 
   const form = useForm<ClientForm>({
     resolver: zodResolver(clientFormSchema),
@@ -81,7 +94,42 @@ export default function DailyAddedPage() {
       }));
       setRegisteredAgents(parsedAgents);
     }
+    
+    // Initial load and calculation of stats
+    calculateStats();
   }, []);
+
+  const calculateStats = () => {
+    const allDailyClients: Client[] = JSON.parse(localStorage.getItem('dailyAddedClients') || '[]').map((c: any) => ({...c, date: new Date(c.date)}));
+    const today = startOfToday();
+
+    const daily = allDailyClients.filter(c => isToday(c.date));
+    const monthly = allDailyClients.filter(c => isThisMonth(c.date));
+
+    setDailyCount(daily.length);
+    setMonthlyCount(monthly.length);
+    setTotalCount(allDailyClients.length);
+
+    const stats: AgentStats = {};
+
+    registeredAgents.forEach(agent => {
+        stats[agent.name] = { daily: 0, monthly: 0};
+    });
+
+    daily.forEach(client => {
+        if(stats[client.assignedAgent]) {
+            stats[client.assignedAgent].daily++;
+        }
+    });
+
+    monthly.forEach(client => {
+        if(stats[client.assignedAgent]) {
+            stats[client.assignedAgent].monthly++;
+        }
+    });
+
+    setAgentStats(stats);
+  }
 
   const handleAddClient = () => {
     const agentValue = form.getValues('assignedAgent');
@@ -159,6 +207,9 @@ export default function DailyAddedPage() {
 
         form.reset({ assignedAgent: "" });
         setPastedDetails('');
+        
+        // Recalculate stats after adding a new client
+        calculateStats();
 
     } catch (error: any) {
         toast({
@@ -175,12 +226,67 @@ export default function DailyAddedPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Daily Added Clients</h1>
           <p className="text-muted-foreground mt-1">
-            Paste client details to add them to the daily list.
+            Track and manage daily client entries and statistics.
           </p>
         </div>
       </div>
       
       <div className="space-y-8">
+
+        {/* Dashboard Section */}
+        <div>
+            <h2 className="text-xl font-semibold mb-4 flex items-center"><TrendingUp className="mr-2 h-5 w-5" /> Dashboard</h2>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Daily Clients</CardTitle>
+                        <User className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{dailyCount}</div>
+                        <p className="text-xs text-muted-foreground">Clients added today</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Monthly Clients</CardTitle>
+                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{monthlyCount}</div>
+                        <p className="text-xs text-muted-foreground">Clients added this month</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{totalCount}</div>
+                        <p className="text-xs text-muted-foreground">All-time client count</p>
+                    </CardContent>
+                </Card>
+                <Card className="md:col-span-2 lg:col-span-1">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Agent Performance</CardTitle>
+                        <UserCheckIcon className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent className='text-sm'>
+                       <div className="space-y-2">
+                         {Object.keys(agentStats).length > 0 ? Object.entries(agentStats).map(([agent, stats]) => (
+                           <div key={agent} className="flex justify-between">
+                             <span className="font-medium">{agent}</span>
+                             <span className="text-muted-foreground">D: {stats.daily} | M: {stats.monthly}</span>
+                           </div>
+                         )) : <p className="text-muted-foreground text-xs">No agent activity yet.</p>}
+                       </div>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+
+        {/* Parsing Area */}
         <div>
             <h2 className="text-xl font-semibold mb-4 flex items-center"><TextSearch className="mr-2 h-5 w-5" /> Parsing Area</h2>
             <div className='space-y-4'>
@@ -228,6 +334,7 @@ export default function DailyAddedPage() {
             </div>
         </div>
         
+        {/* Table Area */}
         <div>
             <h2 className="text-xl font-semibold mb-4">Added This Session</h2>
             {sessionClients.length > 0 ? (
