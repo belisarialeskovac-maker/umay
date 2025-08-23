@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { isToday, isThisMonth } from "date-fns"
-import { User, Calendar, BarChart, Banknote, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react"
+import { User, Calendar, BarChart, Banknote, Plus, Trash2, ChevronUp, ChevronDown, FileText, RefreshCw, Languages, Copy, Download, Upload } from "lucide-react"
 
 import {
   Form,
@@ -89,6 +89,9 @@ export default function ReportingPage() {
   const [clientInfoList, setClientInfoList] = useState<ClientInformation[]>([
     { id: 1, shopId: '', assets: '', clientDetails: '', conversationSummary: '', planForTomorrow: '', isCollapsed: false },
   ]);
+  
+  const [generatedReport, setGeneratedReport] = useState("");
+  const [isReportCardCollapsed, setReportCardCollapsed] = useState(false);
   
   const { toast } = useToast();
 
@@ -176,6 +179,101 @@ export default function ReportingPage() {
     const filledCount = requiredFields.filter(field => client[field].trim() !== '').length;
     return (filledCount / requiredFields.length) * 100;
   }
+
+  const handleGenerateReport = () => {
+    if (!selectedAgent) {
+        toast({ title: "Agent not selected", description: "Please select an agent first.", variant: "destructive" });
+        return;
+    }
+
+    const isAnyClientInfoFilled = clientInfoList.some(c => c.conversationSummary.trim() || c.planForTomorrow.trim());
+    if (!isAnyClientInfoFilled) {
+        toast({ title: "No client information", description: "Please fill in some client information before generating a report.", variant: "destructive" });
+        return;
+    }
+
+    const reportParts = [
+        `AGENT NAME: ${selectedAgent}`,
+        `DATE: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+        '',
+        `Added Client Today: ${agentStats.addedToday}`,
+        `Monthly Client Added: ${agentStats.monthlyAdded}`,
+        `Open Shops: ${agentStats.openShops}`,
+        `Deposits: $${agentStats.monthlyDeposits.toFixed(2)}`,
+        '---',
+    ];
+
+    clientInfoList.forEach((client, index) => {
+        if(client.conversationSummary.trim() || client.planForTomorrow.trim()) {
+            reportParts.push(`CLIENT ${index + 1}:`);
+            if (client.shopId) reportParts.push(`Shop ID: ${client.shopId}`);
+            if (client.assets) reportParts.push(`Assets: ${client.assets}`);
+            if (client.clientDetails) reportParts.push(`Client Details: ${client.clientDetails}`);
+            if (client.conversationSummary) reportParts.push(`Conversation Summary: ${client.conversationSummary}`);
+            if (client.planForTomorrow) reportParts.push(`Plan for Tomorrow: ${client.planForTomorrow}`);
+            reportParts.push('');
+        }
+    });
+
+    setGeneratedReport(reportParts.join('\n'));
+    setReportCardCollapsed(false);
+    toast({ title: "Report Generated", description: "The report has been successfully generated." });
+  };
+  
+  const handleClearReport = () => setGeneratedReport('');
+
+  const handleCopyReport = () => {
+      if (!generatedReport) {
+          toast({ title: "Nothing to copy", description: "Generate a report first.", variant: "destructive" });
+          return;
+      }
+      navigator.clipboard.writeText(generatedReport);
+      toast({ title: "Report Copied", description: "The report has been copied to your clipboard." });
+  }
+
+  const handleExportJson = () => {
+      if (!selectedAgent || clientInfoList.every(c => !c.conversationSummary.trim() && !c.planForTomorrow.trim())) {
+          toast({ title: "No data to export", description: "Select an agent and fill in client info.", variant: "destructive"});
+          return;
+      }
+      const data = {
+          agent: selectedAgent,
+          stats: agentStats,
+          clients: clientInfoList,
+      };
+      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
+      const link = document.createElement("a");
+      link.href = jsonString;
+      link.download = `report_${selectedAgent}_${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      toast({ title: "JSON Exported", description: "The report data has been exported." });
+  };
+  
+  const handleImportJson = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+          try {
+              const text = e.target?.result;
+              if (typeof text === 'string') {
+                  const data = JSON.parse(text);
+                  if (data.agent && data.clients) {
+                      handleAgentChange(data.agent);
+                      setClientInfoList(data.clients.map((c: any, i: number) => ({...c, id: c.id || i+1, isCollapsed: c.isCollapsed ?? false})));
+                      toast({ title: "JSON Imported", description: "Report data has been successfully imported." });
+                  } else {
+                      throw new Error("Invalid JSON format");
+                  }
+              }
+          } catch (error) {
+              toast({ title: "Import Failed", description: "The selected file is not a valid report JSON.", variant: "destructive" });
+          }
+      };
+      reader.readAsText(file);
+      event.target.value = ''; // Reset input
+  };
   
   return (
     <div className="w-full h-full space-y-6">
@@ -314,6 +412,39 @@ export default function ReportingPage() {
                 <Plus className="mr-2 h-4 w-4"/> Add Another Client
             </Button>
         </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader className="flex flex-row justify-between items-center cursor-pointer" onClick={() => setReportCardCollapsed(!isReportCardCollapsed)}>
+            <div>
+                <CardTitle className="flex items-center"><FileText className="mr-2"/>Generate Your Report</CardTitle>
+                <CardDescription>Click here to create, export, and manage your completed report</CardDescription>
+            </div>
+            <Button variant="ghost" size="sm">{isReportCardCollapsed ? <ChevronDown/> : <ChevronUp/>} {isReportCardCollapsed ? 'Show' : 'Hide'}</Button>
+        </CardHeader>
+        {!isReportCardCollapsed && (
+            <CardContent>
+                <div className="flex flex-wrap gap-2 mb-4">
+                    <Button onClick={handleGenerateReport}><FileText className="mr-2 h-4 w-4" />Generate Report</Button>
+                    <Button variant="outline" onClick={handleClearReport}><RefreshCw className="mr-2 h-4 w-4" />Clear</Button>
+                    <Button variant="outline" onClick={() => {toast({title: "Coming Soon!", description: "Translation feature will be available shortly."})}}><Languages className="mr-2 h-4 w-4" />Translate</Button>
+                    <Button variant="outline" onClick={handleCopyReport}><Copy className="mr-2 h-4 w-4" />Copy</Button>
+                    <Button variant="outline" onClick={handleExportJson}><Download className="mr-2 h-4 w-4" />Export JSON</Button>
+                    <Button variant="outline" asChild>
+                        <Label htmlFor="import-json" className="cursor-pointer">
+                            <Upload className="mr-2 h-4 w-4" />Import JSON
+                            <Input id="import-json" type="file" className="hidden" accept=".json" onChange={handleImportJson}/>
+                        </Label>
+                    </Button>
+                </div>
+                <Textarea 
+                    value={generatedReport}
+                    readOnly
+                    placeholder="Your generated report will appear here..."
+                    className="min-h-[200px] bg-muted"
+                />
+            </CardContent>
+        )}
       </Card>
     </div>
   )
