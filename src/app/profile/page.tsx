@@ -3,7 +3,8 @@
 
 import { useState, useEffect } from "react"
 import { format } from "date-fns"
-import { X } from "lucide-react"
+import { X, FileText } from "lucide-react"
+import Link from "next/link"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -152,11 +153,18 @@ function ProfilePage() {
 
   return (
     <div className="w-full h-full">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-foreground">My Profile</h1>
-        <p className="text-muted-foreground mt-1">
-          View your personal records and performance metrics.
-        </p>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+            <h1 className="text-3xl font-bold text-foreground">My Profile</h1>
+            <p className="text-muted-foreground mt-1">
+            View your personal records and performance metrics.
+            </p>
+        </div>
+        <Button asChild>
+            <Link href="/my-report">
+                <FileText className="mr-2 h-4 w-4" /> Create My Report
+            </Link>
+        </Button>
       </div>
 
       <Card>
@@ -301,3 +309,5 @@ function ProfilePage() {
 }
 
 export default withAuth(ProfilePage, ['Agent', 'Admin', 'Superadmin']);
+
+    

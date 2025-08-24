@@ -32,7 +32,8 @@ import {
   Video,
   ChevronRight,
   LogOut,
-  User as UserIcon
+  User as UserIcon,
+  FileSignature
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ import { useAuth } from '@/context/auth-context';
 const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/profile', icon: UserIcon, label: 'Profile', roles: ['Agent', 'Admin', 'Superadmin'] },
+  { href: '/my-report', icon: FileSignature, label: 'My Report', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/videocall-template', icon: Video, label: 'Videocall Template', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/client-details', icon: Users, label: 'Client Details', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/order-request', icon: ClipboardList, label: 'Order Request', roles: ['Agent', 'Admin', 'Superadmin'] },
@@ -48,7 +50,7 @@ const navItems = [
   { href: '/withdrawal', icon: ArrowUpFromLine, label: 'Withdrawal', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/team-performance', icon: AreaChart, label: 'Team Performance', roles: ['Admin', 'Superadmin'] },
   { href: '/agent-performance', icon: UserCheck, label: 'Agent Performance', roles: ['Admin', 'Superadmin'] },
-  { href: '/reporting', icon: FileText, label: 'Reporting', roles: ['Agent', 'Admin', 'Superadmin'] },
+  { href: '/reporting', icon: FileText, label: 'Reporting', roles: ['Admin', 'Superadmin'] },
   { href: '/daily-added', icon: CalendarPlus, label: 'Daily Added', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/inventory', icon: Boxes, label: 'Inventory', roles: ['Admin', 'Superadmin'] },
   { href: '#', icon: Megaphone, label: 'Announcement', roles: ['Agent', 'Admin', 'Superadmin'] },
@@ -147,3 +149,5 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   )
 }
+
+    
