@@ -6,7 +6,7 @@ import { getAuth, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { app, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 
 export interface UserProfile {
@@ -32,6 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const auth = getAuth(app);
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
@@ -88,7 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [auth]);
+  }, [auth, toast]);
 
   const logout = async () => {
     setLoading(true);
