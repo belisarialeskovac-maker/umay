@@ -7,13 +7,13 @@ import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDW0p16V6BiS4ZbaVkUfxCKajELamYaPOs",
-  authDomain: "project-1a07d.firebaseapp.com",
-  projectId: "project-1a07d",
-  storageBucket: "project-1a07d.appspot.com",
-  messagingSenderId: "69392006548",
-  appId: "1:69392006548:web:3e705fd22098396f90a381",
-  measurementId: "G-ZFPYDM2MCM"
+  "projectId": "collaboard-466cm",
+  "appId": "1:390446656857:web:cfef159220da57daee3048",
+  "storageBucket": "collaboard-466cm.firebasestorage.app",
+  "apiKey": "AIzaSyDGmRmjCghKbxngOHPV1IHQdT7xzXhhxp4",
+  "authDomain": "collaboard-466cm.firebaseapp.com",
+  "measurementId": "",
+  "messagingSenderId": "390446656857"
 };
 
 // Initialize Firebase
