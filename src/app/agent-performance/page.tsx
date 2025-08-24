@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
-import { CalendarIcon, X, MoreHorizontal, Edit, Trash2 } from "lucide-react"
+import { CalendarIcon, X, MoreHorizontal, Edit, Trash2, Loader2 } from "lucide-react"
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth"
 
 import { cn } from "@/lib/utils"
@@ -161,7 +161,7 @@ type Reward = {
 
 
 function AgentPerformancePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [open, setOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false);
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
@@ -350,6 +350,14 @@ function AgentPerformancePage() {
   }
   
   const canRegisterAgent = user?.role === 'Admin' || user?.role === 'Superadmin';
+  
+  if (authLoading) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
+  }
 
   return (
     <div className="w-full h-full">
@@ -785,6 +793,3 @@ function AgentPerformancePage() {
 
 
 export default withAuth(AgentPerformancePage, ['Admin', 'Superadmin']);
-
-    
-    

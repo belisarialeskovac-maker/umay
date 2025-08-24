@@ -66,7 +66,7 @@ type AgentStats = {
 }
 
 function DailyAddedPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [sessionClients, setSessionClients] = useState<Client[]>([]);
   const [allClients, setAllClients] = useState<Client[]>([]);
   const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([]);
@@ -273,6 +273,14 @@ function DailyAddedPage() {
             variant: "destructive"
         })
     }
+  }
+  
+  if (authLoading) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
   }
 
   return (

@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react"
 import { format } from "date-fns"
-import { X, FileText } from "lucide-react"
+import { X, FileText, Loader2 } from "lucide-react"
 import Link from "next/link"
 
 import { cn } from "@/lib/utils"
@@ -95,7 +95,7 @@ type Reward = {
 
 
 function ProfilePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [agentClients, setAgentClients] = useState<Client[]>([]);
   const [agentDeposits, setAgentDeposits] = useState<Transaction[]>([]);
@@ -143,10 +143,10 @@ function ProfilePage() {
     }
   }, [user]);
 
-  if (!user) {
+  if (authLoading || !user) {
     return (
         <div className="flex items-center justify-center h-full">
-            <p>Loading profile...</p>
+            <Loader2 className="h-8 w-8 animate-spin" />
         </div>
     )
   }
@@ -160,11 +160,6 @@ function ProfilePage() {
             View your personal records and performance metrics.
             </p>
         </div>
-        <Button asChild>
-            <Link href="/my-report">
-                <FileText className="mr-2 h-4 w-4" /> Create My Report
-            </Link>
-        </Button>
       </div>
 
       <Card>

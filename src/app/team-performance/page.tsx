@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format, isToday, isThisMonth } from "date-fns"
-import { CalendarIcon, Edit, Save, X } from "lucide-react"
+import { CalendarIcon, Edit, Save, X, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, updateDoc, onSnapshot, query, doc, Timestamp, getDoc, setDoc, getDocs } from "firebase/firestore";
 
@@ -134,7 +134,7 @@ type Penalty = z.infer<typeof penaltySchema> & { id: string }
 type Reward = z.infer<typeof rewardSchema> & { id: string }
 
 function TeamPerformancePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [absences, setAbsences] = useState<Absence[]>([])
   const [penalties, setPenalties] = useState<Penalty[]>([])
   const [rewards, setRewards] = useState<Reward[]>([])
@@ -280,6 +280,14 @@ function TeamPerformancePage() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: keyof TeamPerformanceData) => {
       const value = e.target.type === 'number' ? Number(e.target.value) : e.target.value;
       setEditedData(prev => ({...prev, [field]: value}));
+  }
+  
+  if (authLoading) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
   }
 
   return (
@@ -676,5 +684,3 @@ function TeamPerformancePage() {
 
 
 export default withAuth(TeamPerformancePage, ['Admin', 'Superadmin']);
-
-    

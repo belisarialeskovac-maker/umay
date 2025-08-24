@@ -4,12 +4,13 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { Users, ArrowDownToLine, ArrowUpFromLine, Loader2 } from "lucide-react";
 import { format, getMonth, getYear, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, Timestamp } from "firebase/firestore";
 import withAuth from '@/components/with-auth';
 import type { UserProfile } from '@/context/auth-context';
+import { useAuth } from '@/context/auth-context';
 
 type Client = {
   kycCompletedDate: Date;
@@ -21,6 +22,7 @@ type Transaction = {
 };
 
 function Home() {
+  const { loading: authLoading } = useAuth();
   const [stats, setStats] = useState({
     clients: 0,
     deposits: 0,
@@ -84,6 +86,13 @@ function Home() {
     calculateStats();
   }, [selectedMonth, selectedYear, allClients, allDeposits, allWithdrawals]);
 
+  if (authLoading) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
+  }
 
   return (
     <div className="w-full h-full">
