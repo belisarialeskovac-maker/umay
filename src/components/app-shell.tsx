@@ -30,6 +30,7 @@ import {
   Video,
   LogOut,
   User as UserIcon,
+  Store,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,7 @@ import { useAuth } from '@/context/auth-context';
 const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/profile', icon: UserIcon, label: 'Profile', roles: ['Agent', 'Admin', 'Superadmin'] },
-  { href: '/shop-details', icon: Users, label: 'Shops', roles: ['Agent', 'Admin', 'Superadmin'] },
+  { href: '/shop-details', icon: Store, label: 'Shops', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/order-request', icon: ClipboardList, label: 'Order Request', roles: ['Admin', 'Superadmin'] },
   { href: '/transactions', icon: ArrowRightLeft, label: 'Transactions', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/team-performance', icon: AreaChart, label: 'Team Performance', roles: ['Admin', 'Superadmin'] },
@@ -139,5 +140,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   )
 }
-
-    
