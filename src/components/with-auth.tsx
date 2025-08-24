@@ -24,12 +24,16 @@ const withAuth = <P extends object>(
       }
     }, [user, loading, router, allowedRoles]);
 
-    if (loading || !user || (allowedRoles && !allowedRoles.includes(user.role))) {
+    if (loading) {
       return (
         <div className="flex h-screen w-full items-center justify-center">
             <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
         </div>
       );
+    }
+    
+    if (!user || (allowedRoles && !allowedRoles.includes(user.role))) {
+      return null; // or a loading spinner, but this prevents flashing the component
     }
 
     return <WrappedComponent {...props} />;
