@@ -176,91 +176,93 @@ function ProfilePage() {
                     <Video className="mr-2 h-4 w-4" /> Videocall Template
                 </Link>
             </Button>
-            <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
-                <DialogTrigger asChild>
-                    <Button><ClipboardList className="mr-2 h-4 w-4" /> Request an Order</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Request New Order</DialogTitle>
-                        <DialogDescription>
-                            Fill in the details below to request a new order. An admin will review it.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <Form {...orderForm}>
-                    <form onSubmit={orderForm.handleSubmit(onOrderSubmit)} className="space-y-4">
-                        <FormField
-                            control={orderForm.control}
-                            name="shopId"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Shop ID</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!user}>
-                                    <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a Shop ID" />
-                                    </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                    {agentClients.map((client) => (
-                                        <SelectItem key={client.id} value={client.shopId}>
-                                        {client.shopId} ({client.clientName})
-                                        </SelectItem>
-                                    ))}
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={orderForm.control}
-                            name="location"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Location</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="Enter location" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={orderForm.control}
-                            name="price"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Price</FormLabel>
-                                <FormControl>
-                                    <Input type="number" placeholder="Enter price" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={orderForm.control}
-                            name="remarks"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Remarks</FormLabel>
-                                <FormControl>
-                                    <Textarea placeholder="Enter remarks (optional)" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <DialogFooter>
-                            <Button type="submit" disabled={orderForm.formState.isSubmitting}>
-                               {orderForm.formState.isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Submitting...</> : "Submit Request"}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                    </Form>
-                </DialogContent>
-            </Dialog>
+            {user.role === 'Agent' && (
+              <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
+                  <DialogTrigger asChild>
+                      <Button><ClipboardList className="mr-2 h-4 w-4" /> Request an Order</Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                          <DialogTitle>Request New Order</DialogTitle>
+                          <DialogDescription>
+                              Fill in the details below to request a new order. An admin will review it.
+                          </DialogDescription>
+                      </DialogHeader>
+                      <Form {...orderForm}>
+                      <form onSubmit={orderForm.handleSubmit(onOrderSubmit)} className="space-y-4">
+                          <FormField
+                              control={orderForm.control}
+                              name="shopId"
+                              render={({ field }) => (
+                                  <FormItem>
+                                  <FormLabel>Shop ID</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!user}>
+                                      <FormControl>
+                                      <SelectTrigger>
+                                          <SelectValue placeholder="Select a Shop ID" />
+                                      </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                      {agentClients.map((client) => (
+                                          <SelectItem key={client.id} value={client.shopId}>
+                                          {client.shopId} ({client.clientName})
+                                          </SelectItem>
+                                      ))}
+                                      </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                          <FormField
+                              control={orderForm.control}
+                              name="location"
+                              render={({ field }) => (
+                                  <FormItem>
+                                  <FormLabel>Location</FormLabel>
+                                  <FormControl>
+                                      <Input placeholder="Enter location" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                          <FormField
+                              control={orderForm.control}
+                              name="price"
+                              render={({ field }) => (
+                                  <FormItem>
+                                  <FormLabel>Price</FormLabel>
+                                  <FormControl>
+                                      <Input type="number" placeholder="Enter price" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                          <FormField
+                              control={orderForm.control}
+                              name="remarks"
+                              render={({ field }) => (
+                                  <FormItem>
+                                  <FormLabel>Remarks</FormLabel>
+                                  <FormControl>
+                                      <Textarea placeholder="Enter remarks (optional)" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                          <DialogFooter>
+                              <Button type="submit" disabled={orderForm.formState.isSubmitting}>
+                                {orderForm.formState.isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Submitting...</> : "Submit Request"}
+                              </Button>
+                          </DialogFooter>
+                      </form>
+                      </Form>
+                  </DialogContent>
+              </Dialog>
+            )}
         </div>
       </div>
 
@@ -406,5 +408,3 @@ function ProfilePage() {
 }
 
 export default withAuth(ProfilePage, ['Agent', 'Admin', 'Superadmin']);
-
-    
