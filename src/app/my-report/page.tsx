@@ -428,5 +428,3 @@ function MyReportPage() {
 
 
 export default withAuth(MyReportPage, ['Agent', 'Admin', 'Superadmin']);
-
-    
