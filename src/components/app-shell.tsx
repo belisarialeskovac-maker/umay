@@ -14,6 +14,7 @@ import {
   SidebarInset,
   SidebarTrigger,
   SidebarFooter,
+  SidebarSeparator,
 } from '@/components/ui/sidebar';
 import {
   AreaChart,
@@ -93,7 +94,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
-          <div className="p-2 border-t">
+          <SidebarSeparator />
+          <div className="p-2">
             <div className="flex items-center justify-between group-data-[collapsible=icon]:justify-center">
               <div className="flex items-center gap-3">
                 <Avatar className="size-8">
@@ -126,5 +128,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   )
 }
-
-    
