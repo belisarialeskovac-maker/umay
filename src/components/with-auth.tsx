@@ -17,23 +17,27 @@ const withAuth = <P extends object>(
     const router = useRouter();
 
     useEffect(() => {
-      if (!loading && !user) {
-        router.push('/login');
-      } else if (!loading && user && allowedRoles && !allowedRoles.includes(user.role)) {
-        router.push('/'); // Or a dedicated "unauthorized" page
+      if (loading) {
+        return; // Do nothing while loading
       }
+
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+      
+      if (allowedRoles && !allowedRoles.includes(user.role)) {
+        router.push('/'); // Redirect to a safe page if role not allowed
+      }
+
     }, [user, loading, router, allowedRoles]);
 
-    if (loading) {
+    if (loading || !user || (allowedRoles && !allowedRoles.includes(user.role))) {
       return (
         <div className="flex h-screen w-full items-center justify-center">
             <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
         </div>
       );
-    }
-    
-    if (!user || (allowedRoles && !allowedRoles.includes(user.role))) {
-      return null; // or a loading spinner, but this prevents flashing the component
     }
 
     return <WrappedComponent {...props} />;

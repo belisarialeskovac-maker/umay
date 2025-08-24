@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { app, db } from "@/lib/firebase"
+import { useAuth } from "@/context/auth-context"
 
 const agentTypes = ["Regular", "Elite", "Spammer", "Model", "Team Leader"] as const
 
@@ -51,6 +52,14 @@ export default function SignupPage() {
   const { toast } = useToast()
   const router = useRouter()
   const auth = getAuth(app)
+  const { user, loading: authLoading } = useAuth()
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push('/')
+    }
+  }, [user, authLoading, router])
+
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -89,7 +98,7 @@ export default function SignupPage() {
       
       toast({
         title: "Account Created Successfully!",
-        description: `Your account has been created with the role: ${role}.`,
+        description: `Your account has been created with the role: ${role}. You will now be logged in.`,
       })
       router.push("/")
     } catch (error: any) {
@@ -102,6 +111,14 @@ export default function SignupPage() {
     } finally {
       setLoading(false)
     }
+  }
+  
+  if (authLoading || user) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+      </div>
+    );
   }
 
   return (

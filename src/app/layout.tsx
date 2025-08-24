@@ -1,13 +1,27 @@
-import type { Metadata } from 'next';
+
+"use client";
+
 import './globals.css';
 import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthProvider } from '@/context/auth-context';
+import { AuthProvider, useAuth } from '@/context/auth-context';
+import { usePathname } from 'next/navigation';
 
-export const metadata: Metadata = {
-  title: 'Dashboard',
-  description: 'A modern dashboard.',
-};
+function AppLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const { user, loading } = useAuth();
+  const pathname = usePathname();
+  const isAuthPage = pathname === '/login' || pathname === '/signup';
+
+  if (isAuthPage) {
+    return <>{children}</>
+  }
+  
+  return <AppShell>{children}</AppShell>
+}
 
 export default function RootLayout({
   children,
@@ -26,7 +40,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <AuthProvider>
-          <AppShell>{children}</AppShell>
+          <AppLayout>{children}</AppLayout>
           <Toaster />
         </AuthProvider>
       </body>
