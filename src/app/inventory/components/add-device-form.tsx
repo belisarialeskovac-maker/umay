@@ -23,9 +23,10 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import type { DeviceInventory } from "../page"
+import { useAuth } from "@/context/auth-context"
 
 const formSchema = z.object({
-  agent: z.string().min(1, "Agent is required."),
+  agent: z.string().optional(),
   imei: z.string().min(15, "IMEI must be at least 15 characters.").max(17, "IMEI must be at most 17 characters."),
   model: z.string().min(1, "Model is required."),
   color: z.string().min(1, "Color is required."),
@@ -35,11 +36,12 @@ const formSchema = z.object({
 })
 
 type AddDeviceFormProps = {
-  onSubmit: (device: Omit<DeviceInventory, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>
+  onSubmit: (device: Omit<DeviceInventory, 'id' | 'createdAt' | 'updatedAt'| 'agent'> & { agent?: string }) => Promise<boolean>
   agentNames: string[]
 }
 
 export default function AddDeviceForm({ onSubmit, agentNames }: AddDeviceFormProps) {
+  const { user } = useAuth();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -60,39 +62,44 @@ export default function AddDeviceForm({ onSubmit, agentNames }: AddDeviceFormPro
     }
   }
 
+  const isAgent = user?.role === 'Agent';
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormField
-            control={form.control}
-            name="agent"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Agent</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select an agent" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {agentNames.map((name) => (
-                      <SelectItem key={name} value={name}>
-                        {name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {!isAgent && (
+             <FormField
+                control={form.control}
+                name="agent"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Agent</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                        <SelectTrigger>
+                        <SelectValue placeholder="Select an agent" />
+                        </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                        {agentNames.map((name) => (
+                        <SelectItem key={name} value={name}>
+                            {name}
+                        </SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+          )}
+         
           <FormField
             control={form.control}
             name="imei"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className={isAgent ? 'md:col-span-2' : ''}>
                 <FormLabel>IMEI</FormLabel>
                 <FormControl>
                   <Input placeholder="Enter device IMEI" {...field} />

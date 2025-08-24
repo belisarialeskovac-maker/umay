@@ -44,7 +44,7 @@ const navItems = [
   { href: '/team-performance', icon: AreaChart, label: 'Team Performance', roles: ['Admin', 'Superadmin'] },
   { href: '/agent-performance', icon: UserCheck, label: 'Agent Management', roles: ['Admin', 'Superadmin'] },
   { href: '/daily-added', icon: CalendarPlus, label: 'Daily Added', roles: ['Agent', 'Admin', 'Superadmin'] },
-  { href: '/inventory', icon: Boxes, label: 'Inventory', roles: ['Admin', 'Superadmin'] },
+  { href: '/inventory', icon: Boxes, label: 'Inventory', roles: ['Agent', 'Admin', 'Superadmin'] },
 ];
 
 const settingsNav = { href: '#', icon: Settings, label: 'Settings' };

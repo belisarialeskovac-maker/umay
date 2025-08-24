@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
@@ -13,6 +13,7 @@ import InventoryTable from "./components/inventory-table"
 import AddDeviceForm from "./components/add-device-form"
 import AgentStatistics from "./components/agent-statistics"
 import { useData } from "@/context/data-context"
+import { useAuth } from "@/context/auth-context"
 import withAuth from "@/components/with-auth"
 import type { DeviceInventory } from "@/context/data-context"
 
@@ -21,7 +22,10 @@ export type AgentStats = {
 }
 
 function InventoryPage() {
-  const { inventory: devices, agents, loading: dataLoading } = useData();
+  const { user, loading: authLoading } = useAuth();
+  const { inventory: allDevices, agents, loading: dataLoading } = useData();
+  
+  const [myDevices, setMyDevices] = useState<DeviceInventory[]>([]);
   const [filteredDevices, setFilteredDevices] = useState<DeviceInventory[]>([])
   const [agentStats, setAgentStats] = useState<AgentStats>({})
   const [searchTerm, setSearchTerm] = useState("")
@@ -29,11 +33,19 @@ function InventoryPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    if(!dataLoading) {
-      setFilteredDevices(devices);
-      updateAgentStats(devices);
+    if(!dataLoading && user) {
+      const devicesForUser = user.role === 'Agent' 
+        ? allDevices.filter(d => d.agent === user.name)
+        : allDevices;
+      setMyDevices(devicesForUser);
     }
-  }, [devices, dataLoading]);
+  }, [allDevices, user, dataLoading]);
+
+  useEffect(() => {
+      setFilteredDevices(myDevices);
+      updateAgentStats(myDevices);
+  }, [myDevices]);
+
 
   const agentNames = useMemo(() => agents.map(a => a.name), [agents]);
 
@@ -47,10 +59,10 @@ function InventoryPage() {
 
   useEffect(() => {
     if (searchTerm.trim() === "") {
-      setFilteredDevices(devices)
+      setFilteredDevices(myDevices)
     } else {
       const term = searchTerm.toLowerCase()
-      const filtered = devices.filter((device) => {
+      const filtered = myDevices.filter((device) => {
         return (
           device.agent.toLowerCase().includes(term) ||
           device.imei.toLowerCase().includes(term) ||
@@ -63,11 +75,26 @@ function InventoryPage() {
       })
       setFilteredDevices(filtered)
     }
-  }, [searchTerm, devices])
+  }, [searchTerm, myDevices])
 
   const addDevice = async (device: Omit<DeviceInventory, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) {
+        toast({title: "Error", description: "You must be logged in.", variant: "destructive"});
+        return false;
+    }
+    
+    const deviceToAdd = {
+        ...device,
+        agent: user.role === 'Agent' ? user.name : device.agent,
+    };
+    
+    if(!deviceToAdd.agent){
+        toast({title: "Error", description: "Agent is required.", variant: "destructive"});
+        return false;
+    }
+
     try {
-      const q = query(collection(db, "inventory"), where("imei", "==", device.imei));
+      const q = query(collection(db, "inventory"), where("imei", "==", deviceToAdd.imei));
       const querySnapshot = await getDocs(q);
       if (!querySnapshot.empty) {
         toast({
@@ -79,7 +106,7 @@ function InventoryPage() {
       }
 
       const newDevice = {
-        ...device,
+        ...deviceToAdd,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       }
@@ -161,7 +188,7 @@ function InventoryPage() {
     }
   }
 
-  if (dataLoading) {
+  if (authLoading || dataLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -227,6 +254,6 @@ function InventoryPage() {
   )
 }
 
-export default withAuth(InventoryPage, ['Admin', 'Superadmin']);
+export default withAuth(InventoryPage, ['Agent', 'Admin', 'Superadmin']);
 
     
