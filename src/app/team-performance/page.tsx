@@ -8,7 +8,7 @@ import { z } from "zod"
 import { format, isToday, isThisMonth } from "date-fns"
 import { CalendarIcon, Edit, Save, X } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, updateDoc, onSnapshot, query, doc, Timestamp, getDoc, setDoc } from "firebase/firestore";
+import { collection, addDoc, updateDoc, onSnapshot, query, doc, Timestamp, getDoc, setDoc, getDocs } from "firebase/firestore";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -56,6 +56,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { Textarea } from "@/components/ui/textarea"
+import { useAuth } from "@/context/auth-context"
+import withAuth from "@/components/with-auth"
 
 type Agent = {
   id: string;
@@ -63,6 +65,7 @@ type Agent = {
   email: string;
   dateHired: Date;
   agentType: string;
+  role: string;
 }
 
 type Client = {
@@ -103,6 +106,7 @@ type TeamPerformanceData = {
     totalDeposits: number;
     totalWithdrawals: number;
     lastEditedBy: string;
+    editor?: string;
 };
 
 const absenceSchema = z.object({
@@ -129,7 +133,8 @@ type Absence = z.infer<typeof absenceSchema> & { id: string }
 type Penalty = z.infer<typeof penaltySchema> & { id: string }
 type Reward = z.infer<typeof rewardSchema> & { id: string }
 
-export default function TeamPerformancePage() {
+function TeamPerformancePage() {
+  const { user } = useAuth();
   const [absences, setAbsences] = useState<Absence[]>([])
   const [penalties, setPenalties] = useState<Penalty[]>([])
   const [rewards, setRewards] = useState<Reward[]>([])
@@ -149,50 +154,65 @@ export default function TeamPerformancePage() {
   const penaltyForm = useForm<z.infer<typeof penaltySchema>>({ resolver: zodResolver(penaltySchema), defaultValues: { date: new Date(), amount: 0 } })
   const rewardForm = useForm<z.infer<typeof rewardSchema>>({ resolver: zodResolver(rewardSchema), defaultValues: { date: new Date(), status: "Unclaimed"} })
 
-  const calculatePerformanceMetrics = useCallback(async (agents: Agent[]) => {
-    const dailyAddedSnapshot = await getDocs(collection(db, 'dailyAddedClients'));
-    const dailyAddedClients: DailyAddedClient[] = dailyAddedSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as DailyAddedClient));
 
-    const clientsSnapshot = await getDocs(collection(db, 'clients'));
-    const clients: Client[] = clientsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, kycCompletedDate: (doc.data().kycCompletedDate as Timestamp).toDate() } as Client));
+  const calculatePerformanceMetrics = useCallback(async (agents: Agent[], performanceDocs: {[key: string]: TeamPerformanceData}) => {
+    try {
+        const dailyAddedSnapshot = await getDocs(collection(db, 'dailyAddedClients'));
+        const dailyAddedClients: DailyAddedClient[] = dailyAddedSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as DailyAddedClient));
 
-    const depositsSnapshot = await getDocs(collection(db, 'deposits'));
-    const deposits: Transaction[] = depositsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as Transaction));
-    
-    const withdrawalsSnapshot = await getDocs(collection(db, 'withdrawals'));
-    const withdrawals: Transaction[] = withdrawalsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as Transaction));
+        const clientsSnapshot = await getDocs(collection(db, 'clients'));
+        const clients: Client[] = clientsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, kycCompletedDate: (doc.data().kycCompletedDate as Timestamp).toDate() } as Client));
 
-    const performancePromises = agents.map(async agent => {
-        const agentDailyAdded = dailyAddedClients.filter(c => c.assignedAgent === agent.name && isToday(c.date)).length;
-        const agentMonthlyAdded = dailyAddedClients.filter(c => c.assignedAgent === agent.name && isThisMonth(c.date)).length;
-        const agentOpenAccounts = clients.filter(c => c.agent === agent.name && isThisMonth(c.kycCompletedDate)).length;
-        const agentDeposits = deposits.filter(d => d.agent === agent.name && isThisMonth(d.date)).reduce((sum, d) => sum + d.amount, 0);
-        const agentWithdrawals = withdrawals.filter(w => w.agent === agent.name && isThisMonth(w.date)).reduce((sum, w) => sum + w.amount, 0);
+        const depositsSnapshot = await getDocs(collection(db, 'deposits'));
+        const deposits: Transaction[] = depositsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as Transaction));
         
-        const perfDocRef = doc(db, 'teamPerformance', agent.name);
-        const perfDoc = await getDoc(perfDocRef);
-        const storedAgentData = perfDoc.exists() ? perfDoc.data() as TeamPerformanceData : null;
+        const withdrawalsSnapshot = await getDocs(collection(db, 'withdrawals'));
+        const withdrawals: Transaction[] = withdrawalsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as Transaction));
 
-        return {
-            agentName: agent.name,
-            addedToday: storedAgentData?.lastEditedBy !== 'System' ? storedAgentData.addedToday : agentDailyAdded,
-            monthlyAdded: storedAgentData?.lastEditedBy !== 'System' ? storedAgentData.monthlyAdded : agentMonthlyAdded,
-            openAccounts: storedAgentData?.lastEditedBy !== 'System' ? storedAgentData.openAccounts : agentOpenAccounts,
-            totalDeposits: storedAgentData?.lastEditedBy !== 'System' ? storedAgentData.totalDeposits : agentDeposits,
-            totalWithdrawals: storedAgentData?.lastEditedBy !== 'System' ? storedAgentData.totalWithdrawals : agentWithdrawals,
-            lastEditedBy: storedAgentData?.lastEditedBy ?? "System",
-        };
-    });
+        const performanceData = agents.map(agent => {
+            const systemMetrics = {
+                addedToday: dailyAddedClients.filter(c => c.assignedAgent === agent.name && isToday(c.date)).length,
+                monthlyAdded: dailyAddedClients.filter(c => c.assignedAgent === agent.name && isThisMonth(c.date)).length,
+                openAccounts: clients.filter(c => c.agent === agent.name && isThisMonth(c.kycCompletedDate)).length,
+                totalDeposits: deposits.filter(d => d.agent === agent.name && isThisMonth(d.date)).reduce((sum, d) => sum + d.amount, 0),
+                totalWithdrawals: withdrawals.filter(w => w.agent === agent.name && isThisMonth(w.date)).reduce((sum, w) => sum + w.amount, 0),
+            };
 
-    const performanceData = await Promise.all(performancePromises);
-    setTeamPerformance(performanceData);
-  }, []);
+            const storedAgentData = performanceDocs[agent.name];
+            const isEdited = storedAgentData && storedAgentData.lastEditedBy !== 'System';
+            
+            return {
+                agentName: agent.name,
+                addedToday: isEdited ? storedAgentData.addedToday : systemMetrics.addedToday,
+                monthlyAdded: isEdited ? storedAgentData.monthlyAdded : systemMetrics.monthlyAdded,
+                openAccounts: isEdited ? storedAgentData.openAccounts : systemMetrics.openAccounts,
+                totalDeposits: isEdited ? storedAgentData.totalDeposits : systemMetrics.totalDeposits,
+                totalWithdrawals: isEdited ? storedAgentData.totalWithdrawals : systemMetrics.totalWithdrawals,
+                lastEditedBy: storedAgentData?.editor || "System",
+            };
+        });
+
+        setTeamPerformance(performanceData);
+    } catch (error) {
+        console.error("Error calculating performance metrics:", error);
+        toast({ title: "Error", description: "Could not calculate team performance.", variant: "destructive" });
+    }
+  }, [toast]);
 
   useEffect(() => {
-    const unsubAgents = onSnapshot(collection(db, "agents"), (snapshot) => {
-      const parsedAgents: Agent[] = snapshot.docs.map(doc => ({...doc.data(), id: doc.id, dateHired: (doc.data().dateHired as Timestamp).toDate()} as Agent));
+    const unsubAgents = onSnapshot(collection(db, "agents"), (agentSnapshot) => {
+      const parsedAgents: Agent[] = agentSnapshot.docs.map(doc => ({...doc.data(), id: doc.id, dateHired: (doc.data().dateHired as Timestamp).toDate()} as Agent));
       setRegisteredAgents(parsedAgents);
-      calculatePerformanceMetrics(parsedAgents);
+      
+      const unsubPerformance = onSnapshot(collection(db, 'teamPerformance'), (perfSnapshot) => {
+        const perfDocs: {[key: string]: TeamPerformanceData} = {};
+        perfSnapshot.forEach(doc => {
+            perfDocs[doc.id] = doc.data() as TeamPerformanceData;
+        });
+        calculatePerformanceMetrics(parsedAgents, perfDocs);
+      });
+
+      return () => unsubPerformance();
     });
     
     const unsubAbsences = onSnapshot(collection(db, "absences"), (s) => setAbsences(s.docs.map(d => ({...d.data(), id: d.id, date: (d.data().date as Timestamp).toDate()} as Absence))));
@@ -242,8 +262,14 @@ export default function TeamPerformancePage() {
   }
   
   const handleSave = async (agentName: string) => {
+    if (!user) return;
     const perfDocRef = doc(db, 'teamPerformance', agentName);
-    const dataToSave = { ...teamPerformance.find(p => p.agentName === agentName), ...editedData, lastEditedBy: 'Admin' };
+    const dataToSave = { 
+        ...teamPerformance.find(p => p.agentName === agentName), 
+        ...editedData, 
+        lastEditedBy: 'Admin', // Keep this field for historical reference if needed
+        editor: user.name, // Add an editor field
+    };
     await setDoc(perfDocRef, dataToSave, { merge: true });
     
     setEditingAgent(null);
@@ -647,3 +673,8 @@ export default function TeamPerformancePage() {
     </div>
   )
 }
+
+
+export default withAuth(TeamPerformancePage, ['Admin', 'Superadmin']);
+
+    
