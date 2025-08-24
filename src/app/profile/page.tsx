@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format, isToday, isThisMonth, startOfToday } from "date-fns"
-import { Loader2, Plus, Trash2, ChevronUp, ChevronDown, FileText, RefreshCw, Languages, Copy, Download, Upload, Calendar, BarChart, Banknote, ClipboardList, Video, Boxes } from "lucide-react"
+import { Loader2, Plus, Trash2, ChevronUp, ChevronDown, FileText, RefreshCw, Languages, Copy, Download, Upload, Calendar, BarChart, Banknote, ClipboardList, Video, Boxes, UserCheck } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { doc, setDoc, getDoc, onSnapshot, Timestamp, collection, addDoc } from "firebase/firestore"
 import Link from "next/link"
@@ -60,9 +60,16 @@ import {
 } from "@/components/ui/select"
 
 
+const locations = [
+  "Albania", "Argentina", "Australia", "Canada", "France", "Germany", "Italy", "Japan",
+  "Malaysia", "Netherlands", "Philippines", "Russia", "Singapore", "South Korea",
+  "Spain", "Switzerland", "Thailand", "Turkey", "United Arab Emirates",
+  "United Kingdom", "United States", "Vietnam", "China"
+];
+
 const orderFormSchema = z.object({
   shopId: z.string().min(1, "A shop ID is required."),
-  location: z.string().min(2, "Location must be at least 2 characters."),
+  location: z.string().min(1, "Location is required."),
   price: z.coerce.number().positive("Price must be a positive number."),
   remarks: z.string(),
 })
@@ -215,17 +222,28 @@ function ProfilePage() {
                               )}
                           />
                           <FormField
-                              control={orderForm.control}
-                              name="location"
-                              render={({ field }) => (
-                                  <FormItem>
-                                  <FormLabel>Location</FormLabel>
-                                  <FormControl>
-                                      <Input placeholder="Enter location" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                  </FormItem>
-                              )}
+                            control={orderForm.control}
+                            name="location"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Location</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a location" />
+                                    </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                    {locations.map((location) => (
+                                        <SelectItem key={location} value={location}>
+                                        {location}
+                                        </SelectItem>
+                                    ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                                </FormItem>
+                            )}
                           />
                           <FormField
                               control={orderForm.control}

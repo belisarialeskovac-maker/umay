@@ -59,10 +59,17 @@ import type { Order } from "@/context/data-context"
 const orderStatus = ["Pending", "Approved", "Rejected"] as const;
 type OrderStatus = (typeof orderStatus)[number];
 
+const locations = [
+  "Albania", "Argentina", "Australia", "Canada", "France", "Germany", "Italy", "Japan",
+  "Malaysia", "Netherlands", "Philippines", "Russia", "Singapore", "South Korea",
+  "Spain", "Switzerland", "Thailand", "Turkey", "United Arab Emirates",
+  "United Kingdom", "United States", "Vietnam", "China"
+];
+
 const formSchema = z.object({
   agent: z.string().min(1, "An agent is required."),
   shopId: z.string().min(1, "A shop ID is required."),
-  location: z.string().min(2, "Location must be at least 2 characters."),
+  location: z.string().min(1, "Location is required."),
   price: z.coerce.number().positive("Price must be a positive number."),
   remarks: z.string(),
 })
@@ -279,9 +286,20 @@ function OrderRequestPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Location</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter location" {...field} />
-                      </FormControl>
+                       <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a location" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {locations.map((location) => (
+                            <SelectItem key={location} value={location}>
+                              {location}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -351,5 +369,3 @@ function OrderRequestPage() {
 }
 
 export default withAuth(OrderRequestPage);
-
-    
