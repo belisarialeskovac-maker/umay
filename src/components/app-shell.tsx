@@ -15,6 +15,7 @@ import {
   SidebarTrigger,
   SidebarFooter,
   SidebarSeparator,
+  SidebarMenuBadge,
 } from '@/components/ui/sidebar';
 import {
   AreaChart,
@@ -35,15 +36,16 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/auth-context';
+import { useData } from '@/context/data-context';
 
 const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/profile', icon: UserIcon, label: 'Profile', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/shop-details', icon: Store, label: 'Shops', roles: ['Agent', 'Admin', 'Superadmin'] },
-  { href: '/order-request', icon: ClipboardList, label: 'Order Request', roles: ['Admin', 'Superadmin'] },
+  { href: '/order-request', icon: ClipboardList, label: 'Order Request', roles: ['Admin', 'Superadmin'], badgeKey: 'pendingOrders' },
   { href: '/transactions', icon: ArrowRightLeft, label: 'Transactions', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/team-performance', icon: AreaChart, label: 'Team Performance', roles: ['Admin', 'Superadmin'] },
-  { href: '/agent-performance', icon: UserCheck, label: 'Agent Management', roles: ['Admin', 'Superadmin'] },
+  { href: '/agent-performance', icon: UserCheck, label: 'Agent Management', roles: ['Admin', 'Superadmin'], badgeKey: 'pendingAgents' },
   { href: '/daily-added', icon: CalendarPlus, label: 'Daily Added', roles: ['Agent', 'Admin', 'Superadmin'] },
 ];
 
@@ -51,9 +53,19 @@ const settingsNav = { href: '#', icon: Settings, label: 'Settings' };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
+  const { agents, orders, loading: dataLoading } = useData();
   
-  if (loading) {
+  const pendingAgentsCount = agents.filter(agent => agent.status === 'Pending').length;
+  const pendingOrdersCount = orders.filter(order => order.status === 'Pending').length;
+
+  const badgeCounts = {
+    pendingAgents: pendingAgentsCount,
+    pendingOrders: pendingOrdersCount,
+  };
+
+  
+  if (authLoading || dataLoading) {
       return (
           <div className="flex h-screen w-full items-center justify-center">
               <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
@@ -83,16 +95,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {navItems.filter(item => item.roles.includes(user.role)).map((item) => (
+            {navItems.filter(item => item.roles.includes(user.role)).map((item) => {
+              const badgeCount = item.badgeKey ? badgeCounts[item.badgeKey as keyof typeof badgeCounts] : 0;
+              return (
               <SidebarMenuItem key={item.label}>
                 <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
                   <Link href={item.href}>
                     <item.icon />
                     <span>{item.label}</span>
+                     {badgeCount > 0 && <SidebarMenuBadge>{badgeCount}</SidebarMenuBadge>}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            ))}
+            )})}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="flex flex-col gap-4">
