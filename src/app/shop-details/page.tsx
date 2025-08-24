@@ -166,7 +166,7 @@ function ShopDetailsPage() {
     try {
       await addDoc(collection(db, "clients"), values);
       toast({
-        title: "Client Added",
+        title: "Shop Added",
         description: `Successfully added ${values.clientName}.`,
       })
       setOpen(false)
@@ -175,7 +175,7 @@ function ShopDetailsPage() {
       console.error("Error adding client: ", error);
       toast({
         title: "Error",
-        description: "Failed to add client.",
+        description: "Failed to add shop.",
         variant: "destructive"
       });
     }
@@ -186,10 +186,10 @@ function ShopDetailsPage() {
     try {
         const clientRef = doc(db, "clients", clientToEdit.id);
         await updateDoc(clientRef, values);
-        toast({ title: "Client Updated", description: "Client details have been updated." });
+        toast({ title: "Shop Updated", description: "Shop details have been updated." });
         setEditOpen(false);
     } catch(error: any) {
-        toast({ title: "Error", description: error.message || "Failed to update client.", variant: "destructive" });
+        toast({ title: "Error", description: error.message || "Failed to update shop.", variant: "destructive" });
     }
   }
 
@@ -198,12 +198,12 @@ function ShopDetailsPage() {
     try {
         await deleteDoc(doc(db, "clients", clientToDelete.id));
         toast({
-            title: "Client Deleted",
+            title: "Shop Deleted",
             description: `${clientToDelete.clientName} has been removed from the database.`,
             variant: "destructive"
         })
     } catch (error: any) {
-         toast({ title: "Error", description: error.message || "Failed to delete client.", variant: "destructive" });
+         toast({ title: "Error", description: error.message || "Failed to delete shop.", variant: "destructive" });
     }
     setDeleteAlertOpen(false);
     setClientToDelete(null);
@@ -216,10 +216,10 @@ function ShopDetailsPage() {
     });
     try {
       await batch.commit();
-      toast({ title: "Clients Deleted", description: `${selectedClients.length} clients have been deleted.` });
+      toast({ title: "Shops Deleted", description: `${selectedClients.length} shops have been deleted.` });
       setSelectedClients([]);
     } catch(error: any) {
-      toast({ title: "Error", description: "Failed to delete selected clients.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to delete selected shops.", variant: "destructive" });
     }
     setBulkDeleteAlertOpen(false);
   }
@@ -235,10 +235,10 @@ function ShopDetailsPage() {
     });
      try {
       await batch.commit();
-      toast({ title: "Status Updated", description: `Status for ${selectedClients.length} clients has been updated to ${newBulkStatus}.` });
+      toast({ title: "Status Updated", description: `Status for ${selectedClients.length} shops has been updated to ${newBulkStatus}.` });
       setSelectedClients([]);
     } catch(error: any) {
-      toast({ title: "Error", description: "Failed to update client statuses.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update shop statuses.", variant: "destructive" });
     }
     setBulkStatusDialogOpen(false);
     setNewBulkStatus('');
@@ -304,13 +304,13 @@ function ShopDetailsPage() {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button>Add New Client</Button>
+            <Button>Add New Shop</Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Add New Client</DialogTitle>
+              <DialogTitle>Add New Shop</DialogTitle>
               <DialogDescription>
-                Fill in the details below to add a new client.
+                Fill in the details below to add a new shop.
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -358,7 +358,7 @@ function ShopDetailsPage() {
                 <FormField control={form.control} name="clientDetails" render={({ field }) => (
                     <FormItem><FormLabel>Client Details</FormLabel><FormControl><Textarea placeholder="Enter client details..." {...field} /></FormControl><FormMessage /></FormItem>
                 )}/>
-                <DialogFooter><Button type="submit">Add Client</Button></DialogFooter>
+                <DialogFooter><Button type="submit">Add Shop</Button></DialogFooter>
               </form>
             </Form>
           </DialogContent>
@@ -368,7 +368,7 @@ function ShopDetailsPage() {
        <div className="flex flex-col sm:flex-row gap-4 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search clients..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <Input placeholder="Search shops..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
         <Select value={agentFilter} onValueChange={setAgentFilter}>
             <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by agent" /></SelectTrigger>
@@ -395,7 +395,7 @@ function ShopDetailsPage() {
       
       {selectedClients.length > 0 && (
         <div className="flex items-center gap-4 mb-4 p-3 bg-muted rounded-lg">
-            <p className="text-sm font-medium">{selectedClients.length} client(s) selected.</p>
+            <p className="text-sm font-medium">{selectedClients.length} shop(s) selected.</p>
             <Button size="sm" variant="destructive" onClick={() => setBulkDeleteAlertOpen(true)}>Delete Selected</Button>
             <Button size="sm" variant="outline" onClick={() => setBulkStatusDialogOpen(true)}>Change Status</Button>
         </div>
@@ -448,7 +448,7 @@ function ShopDetailsPage() {
         </div>
         <div className="flex items-center justify-between mt-4">
             <div className="text-sm text-muted-foreground">
-                Showing {paginatedClients.length} of {filteredClients.length} client(s).
+                Showing {paginatedClients.length} of {filteredClients.length} shop(s).
             </div>
             <div className="flex items-center space-x-2">
                 <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button>
@@ -460,7 +460,7 @@ function ShopDetailsPage() {
       ) : (
         <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] p-6">
           <div className="text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">No Clients Found</h2>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">No Shops Found</h2>
             <p className="text-muted-foreground mt-2">Try adjusting your search or filters.</p>
           </div>
         </div>
@@ -470,7 +470,7 @@ function ShopDetailsPage() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-                <DialogTitle>Edit Client</DialogTitle>
+                <DialogTitle>Edit Shop</DialogTitle>
                 <DialogDescription>
                     Update the details for {clientToEdit?.clientName}.
                 </DialogDescription>
@@ -536,7 +536,7 @@ function ShopDetailsPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the client record for {clientToDelete?.clientName}.
+                    This action cannot be undone. This will permanently delete the shop record for {clientToDelete?.clientName}.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -552,7 +552,7 @@ function ShopDetailsPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the selected {selectedClients.length} client records.
+                    This action cannot be undone. This will permanently delete the selected {selectedClients.length} shop records.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -566,8 +566,8 @@ function ShopDetailsPage() {
     <Dialog open={bulkStatusDialogOpen} onOpenChange={setBulkStatusDialogOpen}>
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>Change Status for Selected Clients</DialogTitle>
-                <DialogDescription>Select a new status to apply to the {selectedClients.length} selected clients.</DialogDescription>
+                <DialogTitle>Change Status for Selected Shops</DialogTitle>
+                <DialogDescription>Select a new status to apply to the {selectedClients.length} selected shops.</DialogDescription>
             </DialogHeader>
             <div className="py-4">
                 <Select value={newBulkStatus} onValueChange={(value: typeof clientStatus[number]) => setNewBulkStatus(value)}>
