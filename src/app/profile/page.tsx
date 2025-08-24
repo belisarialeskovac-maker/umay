@@ -1,9 +1,11 @@
 
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
-import { format, isToday, isThisMonth } from "date-fns"
+import { useState, useEffect, useMemo, useCallback } from "react"
+import { format, isToday, isThisMonth, startOfToday } from "date-fns"
 import { Loader2, Plus, Trash2, ChevronUp, ChevronDown, FileText, RefreshCw, Languages, Copy, Download, Upload, Calendar, BarChart, Banknote } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { doc, setDoc, getDoc, onSnapshot, Timestamp } from "firebase/firestore"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -38,7 +40,7 @@ import {
 
 
 type ClientInformation = {
-    id: number;
+    id: string; // Use string for firestore doc id consistency
     shopId: string;
     assets: string;
     clientDetails: string;
@@ -72,12 +74,45 @@ function ProfilePage() {
   const [agentPenalties, setAgentPenalties] = useState<Penalty[]>([]);
   const [agentRewards, setAgentRewards] = useState<Reward[]>([]);
   
-  const [clientInfoList, setClientInfoList] = useState<ClientInformation[]>([
-    { id: 1, shopId: '', assets: '', clientDetails: '', conversationSummary: '', planForTomorrow: '', isCollapsed: false },
-  ]);
+  const [clientInfoList, setClientInfoList] = useState<ClientInformation[]>([]);
   const [generatedReport, setGeneratedReport] = useState("");
   const [isReportCardCollapsed, setReportCardCollapsed] = useState(true);
   const { toast } = useToast();
+  const [isReportDataLoading, setIsReportDataLoading] = useState(true);
+
+  const getReportDocRef = useCallback(() => {
+    if (!user) return null;
+    const todayStr = format(startOfToday(), 'yyyy-MM-dd');
+    return doc(db, 'dailyReports', `${user.uid}_${todayStr}`);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !getReportDocRef()) {
+        setIsReportDataLoading(false);
+        return;
+    };
+    
+    const docRef = getReportDocRef();
+    if (!docRef) return;
+    
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            setClientInfoList(data.clients || []);
+        } else {
+            // No report for today, start with a default one
+             setClientInfoList([{ id: new Date().getTime().toString(), shopId: '', assets: '', clientDetails: '', conversationSummary: '', planForTomorrow: '', isCollapsed: false }]);
+        }
+        setIsReportDataLoading(false);
+    }, (error) => {
+        console.error("Error fetching daily report:", error);
+        toast({title: "Error", description: "Could not load today's report.", variant: "destructive"});
+        setIsReportDataLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, getReportDocRef, toast]);
+
 
   useEffect(() => {
     if (user && !dataLoading) {
@@ -112,9 +147,21 @@ function ProfilePage() {
   }, [user, dailyAddedClients, clients, deposits]);
 
 
+  const saveReportData = async (updatedClientInfoList: ClientInformation[]) => {
+    const docRef = getReportDocRef();
+    if (!docRef) return;
+    try {
+        await setDoc(docRef, { clients: updatedClientInfoList, lastUpdated: Timestamp.now() }, { merge: true });
+    } catch (error) {
+        console.error("Failed to save report data:", error);
+        toast({ title: "Save Error", description: "Failed to save report progress.", variant: "destructive" });
+    }
+  };
+
+
   const addClient = () => {
     const newClient: ClientInformation = {
-      id: clientInfoList.length ? Math.max(...clientInfoList.map(c => c.id)) + 1 : 1,
+      id: new Date().getTime().toString(),
       shopId: '',
       assets: '',
       clientDetails: '',
@@ -122,23 +169,32 @@ function ProfilePage() {
       planForTomorrow: '',
       isCollapsed: false,
     };
-    setClientInfoList([...clientInfoList, newClient]);
+    const updatedList = [...clientInfoList, newClient];
+    setClientInfoList(updatedList);
+    saveReportData(updatedList);
   };
   
-  const removeClient = (id: number) => {
-    setClientInfoList(clientInfoList.filter(client => client.id !== id));
+  const removeClient = (id: string) => {
+    const updatedList = clientInfoList.filter(client => client.id !== id);
+    setClientInfoList(updatedList);
+    saveReportData(updatedList);
   };
   
-  const handleClientInfoChange = (id: number, field: keyof Omit<ClientInformation, 'id' | 'isCollapsed'>, value: string) => {
-    setClientInfoList(clientInfoList.map(client =>
+  const handleClientInfoChange = (id: string, field: keyof Omit<ClientInformation, 'id' | 'isCollapsed'>, value: string) => {
+    const updatedList = clientInfoList.map(client =>
       client.id === id ? { ...client, [field]: value } : client
-    ));
+    );
+    setClientInfoList(updatedList);
+    // Debounce this in a real app if performance is an issue
+    saveReportData(updatedList);
   };
 
-  const toggleClientCollapse = (id: number) => {
-    setClientInfoList(clientInfoList.map(client =>
+  const toggleClientCollapse = (id: string) => {
+    const updatedList = clientInfoList.map(client =>
       client.id === id ? { ...client, isCollapsed: !client.isCollapsed } : client
-    ));
+    );
+    setClientInfoList(updatedList);
+    // No need to save collapse state to DB
   }
 
   const getProgress = (client: ClientInformation) => {
@@ -212,7 +268,7 @@ function ProfilePage() {
       const data = {
           agent: user.name,
           stats: agentStats,
-          clients: clientInfoList,
+          clients: clientInfoList.map(({isCollapsed, ...rest}) => rest), // Don't export UI state
           exportedAt: new Date().toISOString(),
       };
       const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
@@ -234,7 +290,9 @@ function ProfilePage() {
               if (typeof text === 'string') {
                   const data = JSON.parse(text);
                   if (data.agent && data.clients && data.agent === user?.name) {
-                      setClientInfoList(data.clients.map((c: any, i: number) => ({...c, id: c.id || i+1, isCollapsed: c.isCollapsed ?? false})));
+                      const importedClients = data.clients.map((c: any, i: number) => ({...c, id: c.id || new Date().getTime().toString() + i, isCollapsed: false}));
+                      setClientInfoList(importedClients);
+                      saveReportData(importedClients);
                       toast({ title: "JSON Imported", description: "Report data has been successfully imported." });
                   } else {
                       throw new Error("Invalid JSON format or data for another agent.");
@@ -439,75 +497,81 @@ function ProfilePage() {
                             <CardHeader className="flex flex-row justify-between items-center">
                             <div>
                                 <CardTitle>Client Information</CardTitle>
-                                <CardDescription>Enter details for each client you interacted with today.</CardDescription>
+                                <CardDescription>Enter details for each client you interacted with today. Your work is saved automatically.</CardDescription>
                             </div>
                             <Button variant="outline" onClick={addClient}>
                                 <Plus className="mr-2 h-4 w-4"/> Add Client
                             </Button>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {clientInfoList.map((client, index) => (
-                                    <Card key={client.id} className="overflow-hidden">
-                                        <CardHeader className="bg-muted/50 p-4 flex flex-row justify-between items-center cursor-pointer" onClick={() => toggleClientCollapse(client.id)}>
-                                            <div className="flex items-center gap-4">
-                                                <CardTitle className="text-lg">Client {index + 1}</CardTitle>
+                                {isReportDataLoading ? (
+                                    <div className="flex items-center justify-center h-24"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                                ) : clientInfoList.length > 0 ? (
+                                    clientInfoList.map((client, index) => (
+                                        <Card key={client.id} className="overflow-hidden">
+                                            <CardHeader className="bg-muted/50 p-4 flex flex-row justify-between items-center cursor-pointer" onClick={() => toggleClientCollapse(client.id)}>
+                                                <div className="flex items-center gap-4">
+                                                    <CardTitle className="text-lg">Client {index + 1}</CardTitle>
+                                                    <div className="flex items-center gap-2">
+                                                        <Progress value={getProgress(client)} className="w-24 h-2"/>
+                                                        <span className="text-xs text-muted-foreground">{getProgress(client) === 100 ? '2/2 completed' : `${Math.round(getProgress(client)/100 * 2)}/2 completed`}</span>
+                                                    </div>
+                                                </div>
                                                 <div className="flex items-center gap-2">
-                                                    <Progress value={getProgress(client)} className="w-24 h-2"/>
-                                                    <span className="text-xs text-muted-foreground">{getProgress(client) === 100 ? '2/2 completed' : `${Math.round(getProgress(client)/100 * 2)}/2 completed`}</span>
+                                                    <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); removeClient(client.id); }} className="h-8 w-8">
+                                                        <Trash2 className="h-4 w-4"/>
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                        {client.isCollapsed ? <ChevronDown className="h-4 w-4"/> : <ChevronUp className="h-4 w-4"/>}
+                                                    </Button>
                                                 </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); removeClient(client.id); }} className="h-8 w-8">
-                                                    <Trash2 className="h-4 w-4"/>
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                    {client.isCollapsed ? <ChevronDown className="h-4 w-4"/> : <ChevronUp className="h-4 w-4"/>}
-                                                </Button>
-                                            </div>
-                                        </CardHeader>
-                                        {!client.isCollapsed && (
-                                            <CardContent className="p-6 space-y-4">
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <div>
-                                                        <Label htmlFor={`shopId-${client.id}`}>Shop ID</Label>
-                                                        <Select 
-                                                            value={client.shopId} 
-                                                            onValueChange={(value) => handleClientInfoChange(client.id, 'shopId', value)}
-                                                            disabled={!user}
-                                                        >
-                                                            <SelectTrigger id={`shopId-${client.id}`}>
-                                                                <SelectValue placeholder="Select a shop ID" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {agentClients.map(c => (
-                                                                    <SelectItem key={c.id} value={c.shopId}>
-                                                                        {c.shopId} - ({c.clientName})
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
+                                            </CardHeader>
+                                            {!client.isCollapsed && (
+                                                <CardContent className="p-6 space-y-4">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div>
+                                                            <Label htmlFor={`shopId-${client.id}`}>Shop ID</Label>
+                                                            <Select 
+                                                                value={client.shopId} 
+                                                                onValueChange={(value) => handleClientInfoChange(client.id, 'shopId', value)}
+                                                                disabled={!user}
+                                                            >
+                                                                <SelectTrigger id={`shopId-${client.id}`}>
+                                                                    <SelectValue placeholder="Select a shop ID" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {agentClients.map(c => (
+                                                                        <SelectItem key={c.id} value={c.shopId}>
+                                                                            {c.shopId} - ({c.clientName})
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                        <div>
+                                                            <Label htmlFor={`assets-${client.id}`}>Assets</Label>
+                                                            <Input id={`assets-${client.id}`} value={client.assets} onChange={(e) => handleClientInfoChange(client.id, 'assets', e.target.value)} placeholder="Enter client assets"/>
+                                                        </div>
                                                     </div>
                                                     <div>
-                                                        <Label htmlFor={`assets-${client.id}`}>Assets</Label>
-                                                        <Input id={`assets-${client.id}`} value={client.assets} onChange={(e) => handleClientInfoChange(client.id, 'assets', e.target.value)} placeholder="Enter client assets"/>
+                                                        <Label htmlFor={`clientDetails-${client.id}`}>Client Details</Label>
+                                                        <Textarea id={`clientDetails-${client.id}`} value={client.clientDetails} onChange={(e) => handleClientInfoChange(client.id, 'clientDetails', e.target.value)} placeholder="Client Name/ Age/ Job/Location"/>
                                                     </div>
-                                                </div>
-                                                <div>
-                                                    <Label htmlFor={`clientDetails-${client.id}`}>Client Details</Label>
-                                                    <Textarea id={`clientDetails-${client.id}`} value={client.clientDetails} onChange={(e) => handleClientInfoChange(client.id, 'clientDetails', e.target.value)} placeholder="Client Name/ Age/ Job/Location"/>
-                                                </div>
-                                                <div>
-                                                    <Label htmlFor={`conversationSummary-${client.id}`}>Conversation Summary *</Label>
-                                                    <Textarea id={`conversationSummary-${client.id}`} value={client.conversationSummary} onChange={(e) => handleClientInfoChange(client.id, 'conversationSummary', e.target.value)} placeholder="Summarize your conversation"/>
-                                                </div>
-                                                <div>
-                                                    <Label htmlFor={`planForTomorrow-${client.id}`}>Plan for Tomorrow *</Label>
-                                                    <Textarea id={`planForTomorrow-${client.id}`} value={client.planForTomorrow} onChange={(e) => handleClientInfoChange(client.id, 'planForTomorrow', e.target.value)} placeholder="What's the plan for tomorrow?"/>
-                                                </div>
-                                            </CardContent>
-                                        )}
-                                    </Card>
-                                ))}
+                                                    <div>
+                                                        <Label htmlFor={`conversationSummary-${client.id}`}>Conversation Summary *</Label>
+                                                        <Textarea id={`conversationSummary-${client.id}`} value={client.conversationSummary} onChange={(e) => handleClientInfoChange(client.id, 'conversationSummary', e.target.value)} placeholder="Summarize your conversation"/>
+                                                    </div>
+                                                    <div>
+                                                        <Label htmlFor={`planForTomorrow-${client.id}`}>Plan for Tomorrow *</Label>
+                                                        <Textarea id={`planForTomorrow-${client.id}`} value={client.planForTomorrow} onChange={(e) => handleClientInfoChange(client.id, 'planForTomorrow', e.target.value)} placeholder="What's the plan for tomorrow?"/>
+                                                    </div>
+                                                </CardContent>
+                                            )}
+                                        </Card>
+                                    ))
+                                ) : (
+                                    <div className="text-center text-muted-foreground py-8">No client entries for today's report.</div>
+                                )}
                                 <Button variant="outline" onClick={addClient} className="w-full">
                                     <Plus className="mr-2 h-4 w-4"/> Add Another Client
                                 </Button>
@@ -555,3 +619,5 @@ function ProfilePage() {
 }
 
 export default withAuth(ProfilePage, ['Agent', 'Admin', 'Superadmin']);
+
+    
