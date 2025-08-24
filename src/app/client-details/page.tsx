@@ -1,14 +1,14 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, onSnapshot, query, Timestamp } from "firebase/firestore";
+import { collection, addDoc } from "firebase/firestore";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -50,16 +50,8 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
-
-const agentSchema = z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string(),
-    dateHired: z.date(),
-    agentType: z.string(),
-})
-
-type Agent = z.infer<typeof agentSchema>;
+import { useData } from "@/context/data-context"
+import type { Client } from "@/context/data-context"
 
 const clientStatus = ["In Process", "Active", "Eliminated"] as const;
 
@@ -74,12 +66,9 @@ const formSchema = z.object({
   clientDetails: z.string(),
 })
 
-type Client = z.infer<typeof formSchema> & { id: string }
-
 export default function ClientDetailsPage() {
   const [open, setOpen] = useState(false)
-  const [clients, setClients] = useState<Client[]>([])
-  const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([])
+  const { clients, agents, loading: dataLoading } = useData();
   const { toast } = useToast()
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -92,41 +81,6 @@ export default function ClientDetailsPage() {
       status: "In Process",
     },
   })
-
-  useEffect(() => {
-    const agentsQuery = query(collection(db, "agents"));
-    const unsubscribeAgents = onSnapshot(agentsQuery, (querySnapshot) => {
-        const agentsData: Agent[] = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            agentsData.push({ 
-              ...data, 
-              id: doc.id,
-              dateHired: (data.dateHired as Timestamp).toDate()
-            } as Agent);
-        });
-        setRegisteredAgents(agentsData);
-    });
-
-    const clientsQuery = query(collection(db, "clients"));
-    const unsubscribeClients = onSnapshot(clientsQuery, (querySnapshot) => {
-        const clientsData: Client[] = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            clientsData.push({ 
-              ...data, 
-              id: doc.id,
-              kycCompletedDate: (data.kycCompletedDate as Timestamp).toDate()
-            } as Client);
-        });
-        setClients(clientsData);
-    });
-    
-    return () => {
-        unsubscribeAgents();
-        unsubscribeClients();
-    }
-  }, []);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -145,6 +99,14 @@ export default function ClientDetailsPage() {
         variant: "destructive"
       });
     }
+  }
+
+  if (dataLoading) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
   }
 
   return (
@@ -201,7 +163,7 @@ export default function ClientDetailsPage() {
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                         <SelectContent>
-                        {registeredAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
+                        {agents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
                         </SelectContent>
                     </Select>
                     <FormMessage />

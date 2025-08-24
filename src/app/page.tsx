@@ -6,32 +6,19 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, ArrowDownToLine, ArrowUpFromLine, Loader2 } from "lucide-react";
 import { format, getMonth, getYear, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, Timestamp } from "firebase/firestore";
 import withAuth from '@/components/with-auth';
-import type { UserProfile } from '@/context/auth-context';
 import { useAuth } from '@/context/auth-context';
-
-type Client = {
-  kycCompletedDate: Date;
-};
-
-type Transaction = {
-  date: Date;
-  amount: number;
-};
+import { useData } from '@/context/data-context';
 
 function Home() {
   const { loading: authLoading } = useAuth();
+  const { clients: allClients, deposits: allDeposits, withdrawals: allWithdrawals, loading: dataLoading } = useData();
+  
   const [stats, setStats] = useState({
     clients: 0,
     deposits: 0,
     withdrawals: 0,
   });
-  
-  const [allClients, setAllClients] = useState<Client[]>([]);
-  const [allDeposits, setAllDeposits] = useState<Transaction[]>([]);
-  const [allWithdrawals, setAllWithdrawals] = useState<Transaction[]>([]);
 
   const [selectedMonth, setSelectedMonth] = useState<number>(getMonth(new Date()));
   const [selectedYear, setSelectedYear] = useState<number>(getYear(new Date()));
@@ -41,26 +28,6 @@ function Home() {
     value: i,
     label: format(new Date(0, i), 'MMMM'),
   }));
-
-  useEffect(() => {
-    const unsubscribeClients = onSnapshot(query(collection(db, "clients")), (snapshot) => {
-        setAllClients(snapshot.docs.map(doc => ({ ...doc.data(), kycCompletedDate: (doc.data().kycCompletedDate as Timestamp).toDate() } as Client)));
-    });
-
-    const unsubscribeDeposits = onSnapshot(query(collection(db, "deposits")), (snapshot) => {
-        setAllDeposits(snapshot.docs.map(doc => ({ ...doc.data(), date: (doc.data().date as Timestamp).toDate() } as Transaction)));
-    });
-    
-    const unsubscribeWithdrawals = onSnapshot(query(collection(db, "withdrawals")), (snapshot) => {
-        setAllWithdrawals(snapshot.docs.map(doc => ({ ...doc.data(), date: (doc.data().date as Timestamp).toDate() } as Transaction)));
-    });
-
-    return () => {
-        unsubscribeClients();
-        unsubscribeDeposits();
-        unsubscribeWithdrawals();
-    }
-  }, []);
 
   useEffect(() => {
     const calculateStats = () => {
@@ -83,10 +50,12 @@ function Home() {
       });
     };
     
-    calculateStats();
-  }, [selectedMonth, selectedYear, allClients, allDeposits, allWithdrawals]);
+    if (!dataLoading) {
+      calculateStats();
+    }
+  }, [selectedMonth, selectedYear, allClients, allDeposits, allWithdrawals, dataLoading]);
 
-  if (authLoading) {
+  if (authLoading || dataLoading) {
     return (
         <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin" />

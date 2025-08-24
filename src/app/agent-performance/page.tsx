@@ -69,9 +69,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { app, db } from "@/lib/firebase"
-import { collection, onSnapshot, query, where, Timestamp, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore"
+import { doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore"
 import { useAuth } from "@/context/auth-context"
+import { useData } from "@/context/data-context"
 import withAuth from "@/components/with-auth"
+import type { Agent, Client, Transaction, Inventory, Order, Absence, Penalty, Reward } from "@/context/data-context"
 
 const agentTypes = ["Regular", "Elite", "Spammer", "Model", "Team Leader"] as const
 const roles = ["Agent", "Admin", "Superadmin"] as const;
@@ -96,78 +98,17 @@ const formSchema = z.object({
 });
 
 type AgentFormData = z.infer<typeof formSchema>
-type Agent = Omit<AgentFormData, 'password' | 'confirmPassword'> & { id: string, uid: string }
-
-
-type Client = {
-    id: string;
-    shopId: string;
-    clientName: string;
-    agent: string;
-    kycCompletedDate: Date;
-    status: "In Process" | "Active" | "Eliminated";
-    clientDetails: string;
-}
-type Transaction = {
-    id: string;
-    shopId: string;
-    clientName: string;
-    agent: string;
-    date: Date;
-    amount: number;
-    paymentMode: string;
-}
-type Inventory = {
-    id: string;
-    agent: string;
-    imei: string;
-    model: string;
-    color: string;
-    appleIdUsername?: string;
-    appleIdPassword?: string;
-    remarks?: string;
-    createdAt: string;
-    updatedAt: string;
-}
-type Order = {
-    id: string;
-    agent: string;
-    shopId: string;
-    location: string;
-    price: number;
-    remarks: string;
-    status: "Pending" | "Approved" | "Rejected";
-}
-type Absence = {
-  id: string;
-  date: Date;
-  agent: string;
-  remarks: string;
-}
-type Penalty = {
-  id: string;
-  date: Date;
-  agent: string;
-  remarks: string;
-  amount: number;
-}
-type Reward = {
-  id: string;
-  date: Date;
-  agent: string;
-  remarks: string;
-  status: "Claimed" | "Unclaimed"
-}
 
 
 function AgentPerformancePage() {
   const { user, loading: authLoading } = useAuth();
+  const { agents, clients, deposits, withdrawals, inventory, orders, absences, penalties, rewards, loading: dataLoading } = useData();
+
   const [open, setOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false);
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const [agentToEdit, setAgentToEdit] = useState<Agent | null>(null);
-  const [agents, setAgents] = useState<Agent[]>([])
   const { toast } = useToast()
   
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
@@ -198,58 +139,17 @@ function AgentPerformancePage() {
   });
 
   useEffect(() => {
-    const q = query(collection(db, "agents"));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const agentsData: Agent[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        agentsData.push({ 
-          ...data, 
-          id: doc.id,
-          dateHired: (data.dateHired as Timestamp).toDate()
-        } as Agent);
-      });
-      setAgents(agentsData);
-    });
-    return () => unsubscribe();
-  }, []);
-  
-  useEffect(() => {
     if (selectedAgent) {
-        const collections = ["clients", "deposits", "withdrawals", "inventory", "orders", "absences", "penalties", "rewards"];
-        const setters:any = {
-            clients: setAgentClients,
-            deposits: setAgentDeposits,
-            withdrawals: setAgentWithdrawals,
-            inventory: setAgentInventory,
-            orders: setAgentOrders,
-            absences: setAgentAbsences,
-            penalties: setAgentPenalties,
-            rewards: setAgentRewards
-        };
-
-        const unsubscribers = collections.map(col => {
-            const q = query(collection(db, col), where("agent", "==", selectedAgent.name));
-            return onSnapshot(q, (querySnapshot) => {
-                const data: any[] = [];
-                querySnapshot.forEach((doc) => {
-                    const docData = doc.data();
-                    const item: any = { id: doc.id, ...docData };
-                    // Convert Timestamps to Dates
-                    for(const key in item) {
-                        if(item[key] instanceof Timestamp) {
-                            item[key] = item[key].toDate();
-                        }
-                    }
-                    data.push(item);
-                });
-                setters[col](data);
-            });
-        });
-        
-        return () => unsubscribers.forEach(unsub => unsub());
+        setAgentClients(clients.filter(c => c.agent === selectedAgent.name));
+        setAgentDeposits(deposits.filter(d => d.agent === selectedAgent.name));
+        setAgentWithdrawals(withdrawals.filter(w => w.agent === selectedAgent.name));
+        setAgentInventory(inventory.filter(i => i.agent === selectedAgent.name));
+        setAgentOrders(orders.filter(o => o.agent === selectedAgent.name));
+        setAgentAbsences(absences.filter(a => a.agent === selectedAgent.name));
+        setAgentPenalties(penalties.filter(p => p.agent === selectedAgent.name));
+        setAgentRewards(rewards.filter(r => r.agent === selectedAgent.name));
     }
-  }, [selectedAgent]);
+  }, [selectedAgent, clients, deposits, withdrawals, inventory, orders, absences, penalties, rewards]);
 
 
   async function onSubmit(values: AgentFormData) {
@@ -351,7 +251,7 @@ function AgentPerformancePage() {
   
   const canRegisterAgent = user?.role === 'Admin' || user?.role === 'Superadmin';
   
-  if (authLoading) {
+  if (authLoading || dataLoading) {
     return (
         <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin" />

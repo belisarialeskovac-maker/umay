@@ -2,13 +2,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, isToday, isThisMonth } from 'date-fns';
 import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays, Trash2, BarChart, Loader2 } from 'lucide-react';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, query, deleteDoc, doc, getDocs, Timestamp } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, doc, getDocs } from "firebase/firestore";
 
 import { Button } from '@/components/ui/button';
 import {
@@ -35,28 +34,10 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/context/auth-context';
+import { useData } from '@/context/data-context';
 import withAuth from '@/components/with-auth';
 import { Label } from '@/components/ui/label';
-
-const agentSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string(),
-  dateHired: z.date(),
-  agentType: z.string(),
-});
-
-type Agent = z.infer<typeof agentSchema>;
-
-type Client = {
-    id: string;
-    name: string;
-    age: number;
-    location: string;
-    work: string;
-    assignedAgent: string;
-    date: Date;
-};
+import type { DailyAddedClient as Client, Agent } from '@/context/data-context';
 
 type AgentStats = {
     [key: string]: {
@@ -67,9 +48,9 @@ type AgentStats = {
 
 function DailyAddedPage() {
   const { user, loading: authLoading } = useAuth();
+  const { agents, dailyAddedClients, loading: dataLoading } = useData();
+
   const [sessionClients, setSessionClients] = useState<Client[]>([]);
-  const [allClients, setAllClients] = useState<Client[]>([]);
-  const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([]);
   const [pastedDetails, setPastedDetails] = useState('');
   const [isAddingClient, setIsAddingClient] = useState(false);
   const { toast } = useToast();
@@ -108,38 +89,10 @@ function DailyAddedPage() {
   }, []);
 
   useEffect(() => {
-    const agentsQuery = query(collection(db, "agents"));
-    const unsubscribeAgents = onSnapshot(agentsQuery, (querySnapshot) => {
-        const agentsData: Agent[] = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            agentsData.push({ 
-              ...data, 
-              id: doc.id,
-              dateHired: (data.dateHired as Timestamp).toDate()
-            } as Agent);
-        });
-        setRegisteredAgents(agentsData);
-
-        const clientsQuery = query(collection(db, "dailyAddedClients"));
-        const unsubscribeClients = onSnapshot(clientsQuery, (clientSnapshot) => {
-            const clientsData: Client[] = [];
-            clientSnapshot.forEach((doc) => {
-                const data = doc.data();
-                clientsData.push({ 
-                  ...data, 
-                  id: doc.id,
-                  date: (data.date as Timestamp).toDate()
-                } as Client);
-            });
-            setAllClients(clientsData);
-            calculateStats(clientsData, agentsData);
-        });
-        return () => unsubscribeClients();
-    });
-    
-    return () => unsubscribeAgents();
-  }, [calculateStats]);
+    if (!dataLoading) {
+      calculateStats(dailyAddedClients, agents);
+    }
+  }, [dailyAddedClients, agents, dataLoading, calculateStats]);
 
   const ageData = useMemo(() => {
     const ageGroups = {
@@ -151,7 +104,7 @@ function DailyAddedPage() {
         'Unknown': 0,
     };
 
-    allClients.forEach(client => {
+    dailyAddedClients.forEach(client => {
         if (client.age >= 18 && client.age <= 25) ageGroups['18-25']++;
         else if (client.age >= 26 && client.age <= 35) ageGroups['26-35']++;
         else if (client.age >= 36 && client.age <= 45) ageGroups['36-45']++;
@@ -161,7 +114,7 @@ function DailyAddedPage() {
     });
 
     return Object.entries(ageGroups).map(([name, value]) => ({ name, count: value }));
-  }, [allClients]);
+  }, [dailyAddedClients]);
 
 
   const handleAddClient = async () => {
@@ -275,7 +228,7 @@ function DailyAddedPage() {
     }
   }
   
-  if (authLoading) {
+  if (authLoading || dataLoading) {
     return (
         <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin" />

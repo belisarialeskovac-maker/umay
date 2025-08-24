@@ -4,22 +4,14 @@
 import './globals.css';
 import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthProvider, useAuth } from '@/context/auth-context';
-import { usePathname } from 'next/navigation';
+import { AuthProvider } from '@/context/auth-context';
+import { DataProvider } from '@/context/data-context';
 
 function AppLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { user, loading } = useAuth();
-  const pathname = usePathname();
-  const isAuthPage = pathname === '/login' || pathname === '/signup';
-
-  if (isAuthPage) {
-    return <>{children}</>
-  }
-  
   return <AppShell>{children}</AppShell>
 }
 
@@ -40,8 +32,10 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <AuthProvider>
-          <AppLayout>{children}</AppLayout>
-          <Toaster />
+          <DataProvider>
+            <AppLayout>{children}</AppLayout>
+            <Toaster />
+          </DataProvider>
         </AuthProvider>
       </body>
     </html>

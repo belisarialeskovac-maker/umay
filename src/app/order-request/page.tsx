@@ -1,13 +1,13 @@
 
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Check, X, Hourglass, ThumbsUp, ThumbsDown } from "lucide-react"
+import { Check, X, Hourglass, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, updateDoc, onSnapshot, query, doc, Timestamp, where } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button"
 import {
@@ -52,23 +52,8 @@ import {
 } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
-
-const agentSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string(),
-  dateHired: z.date(),
-  agentType: z.string(),
-})
-type Agent = z.infer<typeof agentSchema>;
-
-const clientSchema = z.object({
-  id: z.string(),
-  agent: z.string(),
-  shopId: z.string(),
-  clientName: z.string(),
-});
-type Client = z.infer<typeof clientSchema>;
+import { useData } from "@/context/data-context"
+import type { Order } from "@/context/data-context"
 
 const orderStatus = ["Pending", "Approved", "Rejected"] as const;
 type OrderStatus = (typeof orderStatus)[number];
@@ -81,16 +66,9 @@ const formSchema = z.object({
   remarks: z.string(),
 })
 
-type Order = z.infer<typeof formSchema> & {
-  id: string;
-  status: OrderStatus;
-}
-
 export default function OrderRequestPage() {
   const [open, setOpen] = useState(false)
-  const [orders, setOrders] = useState<Order[]>([])
-  const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([])
-  const [clients, setClients] = useState<Client[]>([])
+  const { orders, agents, clients, loading: dataLoading } = useData();
   const { toast } = useToast()
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -111,31 +89,6 @@ export default function OrderRequestPage() {
     return clients.filter(client => client.agent === watchedAgent);
   }, [watchedAgent, clients]);
 
-  useEffect(() => {
-    const agentsQuery = query(collection(db, "agents"));
-    const unsubscribeAgents = onSnapshot(agentsQuery, (snapshot) => {
-      const agentsData: Agent[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), dateHired: (doc.data().dateHired as Timestamp).toDate() } as Agent));
-      setRegisteredAgents(agentsData);
-    });
-
-    const clientsQuery = query(collection(db, "clients"));
-    const unsubscribeClients = onSnapshot(clientsQuery, (snapshot) => {
-      const clientsData: Client[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
-      setClients(clientsData);
-    });
-    
-    const ordersQuery = query(collection(db, "orders"));
-    const unsubscribeOrders = onSnapshot(ordersQuery, (snapshot) => {
-      const ordersData: Order[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-      setOrders(ordersData);
-    });
-
-    return () => {
-      unsubscribeAgents();
-      unsubscribeClients();
-      unsubscribeOrders();
-    };
-  }, []);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     const newOrder = {
@@ -235,6 +188,14 @@ export default function OrderRequestPage() {
     );
   }
 
+  if (dataLoading) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
+  }
+
   return (
     <div className="w-full h-full">
       <div className="flex justify-between items-center mb-6">
@@ -270,7 +231,7 @@ export default function OrderRequestPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {registeredAgents.map((agent) => (
+                          {agents.map((agent) => (
                             <SelectItem key={agent.id} value={agent.name}>
                               {agent.name}
                             </SelectItem>

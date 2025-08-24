@@ -7,72 +7,34 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, doc, serverTimestamp, getDocs } from "firebase/firestore"
+import { collection, addDoc, updateDoc, deleteDoc, query, where, doc, serverTimestamp, getDocs } from "firebase/firestore"
 
 import InventoryTable from "./components/inventory-table"
 import AddDeviceForm from "./components/add-device-form"
 import AgentStatistics from "./components/agent-statistics"
-
-export type DeviceInventory = {
-  id: string
-  agent: string
-  imei: string
-  model: string
-  color: string
-  appleIdUsername?: string
-  appleIdPassword?: string
-  remarks?: string
-  createdAt: any // Firestore Timestamp
-  updatedAt: any // Firestore Timestamp
-}
+import { useData } from "@/context/data-context"
+import type { DeviceInventory } from "@/context/data-context"
 
 export type AgentStats = {
   [key: string]: number
 }
 
-type Agent = {
-    id: string;
-    name: string;
-}
-
 export default function InventoryPage() {
-  const [devices, setDevices] = useState<DeviceInventory[]>([])
+  const { inventory: devices, agents, loading: dataLoading } = useData();
   const [filteredDevices, setFilteredDevices] = useState<DeviceInventory[]>([])
   const [agentStats, setAgentStats] = useState<AgentStats>({})
-  const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("inventory")
   const { toast } = useToast()
 
   useEffect(() => {
-    setLoading(true)
-    const inventoryQuery = query(collection(db, "inventory"));
-    const unsubscribeInventory = onSnapshot(inventoryQuery, (snapshot) => {
-        const inventoryData: DeviceInventory[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DeviceInventory));
-        setDevices(inventoryData);
-        setFilteredDevices(inventoryData);
-        updateAgentStats(inventoryData);
-        setLoading(false);
-    }, (error) => {
-        console.error("Error fetching inventory:", error);
-        toast({ title: "Error", description: "Failed to load inventory data.", variant: "destructive" });
-        setLoading(false);
-    });
-
-    const agentsQuery = query(collection(db, "agents"));
-    const unsubscribeAgents = onSnapshot(agentsQuery, (snapshot) => {
-        const agentsData: Agent[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Agent));
-        setRegisteredAgents(agentsData);
-    });
-
-    return () => {
-        unsubscribeInventory();
-        unsubscribeAgents();
+    if(!dataLoading) {
+      setFilteredDevices(devices);
+      updateAgentStats(devices);
     }
-  }, [toast]);
+  }, [devices, dataLoading]);
 
-  const agentNames = useMemo(() => registeredAgents.map(a => a.name), [registeredAgents]);
+  const agentNames = useMemo(() => agents.map(a => a.name), [agents]);
 
   const updateAgentStats = (deviceData: DeviceInventory[]) => {
     const stats: AgentStats = {}
@@ -198,6 +160,14 @@ export default function InventoryPage() {
     }
   }
 
+  if (dataLoading) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
   return (
     <div className="w-full h-full">
       <div className="mb-6">
@@ -218,20 +188,14 @@ export default function InventoryPage() {
               <CardTitle>Device Inventory</CardTitle>
             </CardHeader>
             <CardContent>
-              {loading ? (
-                <div className="flex h-40 w-full items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : (
-                <InventoryTable
-                    devices={filteredDevices}
-                    onDelete={deleteDevice}
-                    onUpdate={updateDevice}
-                    searchTerm={searchTerm}
-                    setSearchTerm={setSearchTerm}
-                    agentNames={agentNames}
-                />
-              )}
+              <InventoryTable
+                  devices={filteredDevices}
+                  onDelete={deleteDevice}
+                  onUpdate={updateDevice}
+                  searchTerm={searchTerm}
+                  setSearchTerm={setSearchTerm}
+                  agentNames={agentNames}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -253,13 +217,7 @@ export default function InventoryPage() {
               <CardTitle>Agent Statistics</CardTitle>
             </CardHeader>
             <CardContent>
-              {loading ? (
-                <div className="flex h-40 w-full items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : (
-                <AgentStatistics agentStats={agentStats} />
-              )}
+              <AgentStatistics agentStats={agentStats} />
             </CardContent>
           </Card>
         </TabsContent>

@@ -8,7 +8,7 @@ import { z } from "zod"
 import { format, isToday, isThisMonth } from "date-fns"
 import { CalendarIcon, Edit, Save, X, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, updateDoc, onSnapshot, query, doc, Timestamp, getDoc, setDoc, getDocs } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc, setDoc, getDocs } from "firebase/firestore";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -57,46 +57,9 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { Textarea } from "@/components/ui/textarea"
 import { useAuth } from "@/context/auth-context"
+import { useData } from "@/context/data-context"
 import withAuth from "@/components/with-auth"
-
-type Agent = {
-  id: string;
-  name: string;
-  email: string;
-  dateHired: Date;
-  agentType: string;
-  role: string;
-}
-
-type Client = {
-    id: string;
-    shopId: string;
-    clientName: string;
-    agent: string;
-    kycCompletedDate: Date;
-    status: "In Process" | "Active" | "Eliminated";
-    clientDetails: string;
-}
-
-type DailyAddedClient = {
-    id: string;
-    name: string;
-    age: number;
-    location: string;
-    work: string;
-    assignedAgent: string;
-    date: Date;
-};
-
-type Transaction = {
-    id: string;
-    shopId: string;
-    clientName: string;
-    agent: string;
-    date: Date;
-    amount: number;
-    paymentMode: string;
-}
+import type { Agent, DailyAddedClient, Client, Transaction, Absence, Penalty, Reward } from "@/context/data-context"
 
 type TeamPerformanceData = {
     agentName: string;
@@ -129,20 +92,13 @@ const rewardSchema = z.object({
   status: z.enum(["Claimed", "Unclaimed"]),
 })
 
-type Absence = z.infer<typeof absenceSchema> & { id: string }
-type Penalty = z.infer<typeof penaltySchema> & { id: string }
-type Reward = z.infer<typeof rewardSchema> & { id: string }
-
 function TeamPerformancePage() {
   const { user, loading: authLoading } = useAuth();
-  const [absences, setAbsences] = useState<Absence[]>([])
-  const [penalties, setPenalties] = useState<Penalty[]>([])
-  const [rewards, setRewards] = useState<Reward[]>([])
-  const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([])
+  const { agents, teamPerformance: teamPerformanceDocs, absences, penalties, rewards, loading: dataLoading, dailyAddedClients, clients, deposits, withdrawals } = useData();
+  
   const [teamPerformance, setTeamPerformance] = useState<TeamPerformanceData[]>([])
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
   const [editedData, setEditedData] = useState<Partial<TeamPerformanceData>>({});
-
 
   const [absenceDialogOpen, setAbsenceDialogOpen] = useState(false)
   const [penaltyDialogOpen, setPenaltyDialogOpen] = useState(false)
@@ -155,20 +111,15 @@ function TeamPerformancePage() {
   const rewardForm = useForm<z.infer<typeof rewardSchema>>({ resolver: zodResolver(rewardSchema), defaultValues: { date: new Date(), status: "Unclaimed"} })
 
 
-  const calculatePerformanceMetrics = useCallback(async (agents: Agent[], performanceDocs: {[key: string]: TeamPerformanceData}) => {
-    try {
-        const dailyAddedSnapshot = await getDocs(collection(db, 'dailyAddedClients'));
-        const dailyAddedClients: DailyAddedClient[] = dailyAddedSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as DailyAddedClient));
-
-        const clientsSnapshot = await getDocs(collection(db, 'clients'));
-        const clients: Client[] = clientsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, kycCompletedDate: (doc.data().kycCompletedDate as Timestamp).toDate() } as Client));
-
-        const depositsSnapshot = await getDocs(collection(db, 'deposits'));
-        const deposits: Transaction[] = depositsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as Transaction));
-        
-        const withdrawalsSnapshot = await getDocs(collection(db, 'withdrawals'));
-        const withdrawals: Transaction[] = withdrawalsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as Transaction));
-
+  useEffect(() => {
+    const calculatePerformanceMetrics = (
+        agents: Agent[], 
+        performanceDocs: {[key: string]: TeamPerformanceData},
+        dailyAddedClients: DailyAddedClient[],
+        clients: Client[],
+        deposits: Transaction[],
+        withdrawals: Transaction[]
+    ) => {
         const performanceData = agents.map(agent => {
             const systemMetrics = {
                 addedToday: dailyAddedClients.filter(c => c.assignedAgent === agent.name && isToday(c.date)).length,
@@ -193,39 +144,12 @@ function TeamPerformancePage() {
         });
 
         setTeamPerformance(performanceData);
-    } catch (error) {
-        console.error("Error calculating performance metrics:", error);
-        toast({ title: "Error", description: "Could not calculate team performance.", variant: "destructive" });
+    };
+
+    if (!dataLoading) {
+      calculatePerformanceMetrics(agents, teamPerformanceDocs, dailyAddedClients, clients, deposits, withdrawals);
     }
-  }, [toast]);
-
-  useEffect(() => {
-    const unsubAgents = onSnapshot(collection(db, "agents"), (agentSnapshot) => {
-      const parsedAgents: Agent[] = agentSnapshot.docs.map(doc => ({...doc.data(), id: doc.id, dateHired: (doc.data().dateHired as Timestamp).toDate()} as Agent));
-      setRegisteredAgents(parsedAgents);
-      
-      const unsubPerformance = onSnapshot(collection(db, 'teamPerformance'), (perfSnapshot) => {
-        const perfDocs: {[key: string]: TeamPerformanceData} = {};
-        perfSnapshot.forEach(doc => {
-            perfDocs[doc.id] = doc.data() as TeamPerformanceData;
-        });
-        calculatePerformanceMetrics(parsedAgents, perfDocs);
-      });
-
-      return () => unsubPerformance();
-    });
-    
-    const unsubAbsences = onSnapshot(collection(db, "absences"), (s) => setAbsences(s.docs.map(d => ({...d.data(), id: d.id, date: (d.data().date as Timestamp).toDate()} as Absence))));
-    const unsubPenalties = onSnapshot(collection(db, "penalties"), (s) => setPenalties(s.docs.map(d => ({...d.data(), id: d.id, date: (d.data().date as Timestamp).toDate()} as Penalty))));
-    const unsubRewards = onSnapshot(collection(db, "rewards"), (s) => setRewards(s.docs.map(d => ({...d.data(), id: d.id, date: (d.data().date as Timestamp).toDate()} as Reward))));
-
-    return () => {
-        unsubAgents();
-        unsubAbsences();
-        unsubPenalties();
-        unsubRewards();
-    }
-  }, [calculatePerformanceMetrics]);
+  }, [agents, teamPerformanceDocs, dailyAddedClients, clients, deposits, withdrawals, dataLoading]);
 
   const onAbsenceSubmit = async (values: z.infer<typeof absenceSchema>) => {
     await addDoc(collection(db, "absences"), values);
@@ -282,7 +206,7 @@ function TeamPerformancePage() {
       setEditedData(prev => ({...prev, [field]: value}));
   }
   
-  if (authLoading) {
+  if (authLoading || dataLoading) {
     return (
         <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -395,7 +319,7 @@ function TeamPerformancePage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {registeredAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
+                            {agents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -485,7 +409,7 @@ function TeamPerformancePage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {registeredAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
+                            {agents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -586,7 +510,7 @@ function TeamPerformancePage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {registeredAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
+                            {agents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormMessage />

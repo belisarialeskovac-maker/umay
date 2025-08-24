@@ -6,9 +6,9 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, onSnapshot, query, Timestamp } from "firebase/firestore";
+import { collection, addDoc } from "firebase/firestore";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -31,13 +31,6 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Table,
@@ -49,18 +42,8 @@ import {
 } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-
-const clientSchema = z.object({
-    id: z.string(),
-    shopId: z.string(),
-    clientName: z.string(),
-    agent: z.string(),
-    kycCompletedDate: z.date(),
-    status: z.string(),
-    clientDetails: z.string(),
-})
-
-type Client = z.infer<typeof clientSchema>;
+import { useData } from "@/context/data-context"
+import type { Deposit } from "@/context/data-context"
 
 const paymentModes = ["Ewallet/Online Banking", "Crypto"] as const
 
@@ -75,12 +58,10 @@ const formSchema = z.object({
   paymentMode: z.enum(paymentModes),
 })
 
-type Deposit = z.infer<typeof formSchema> & { id: string }
 
 export default function DepositPage() {
   const [open, setOpen] = useState(false)
-  const [deposits, setDeposits] = useState<Deposit[]>([])
-  const [clients, setClients] = useState<Client[]>([])
+  const { deposits, clients, loading: dataLoading } = useData();
   const { toast } = useToast()
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -96,41 +77,6 @@ export default function DepositPage() {
   })
 
   const watchedShopId = form.watch("shopId");
-
-  useEffect(() => {
-    const clientsQuery = query(collection(db, "clients"));
-    const unsubscribeClients = onSnapshot(clientsQuery, (querySnapshot) => {
-        const clientsData: Client[] = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            clientsData.push({ 
-              ...data, 
-              id: doc.id,
-              kycCompletedDate: (data.kycCompletedDate as Timestamp).toDate()
-            } as Client);
-        });
-        setClients(clientsData);
-    });
-
-    const depositsQuery = query(collection(db, "deposits"));
-    const unsubscribeDeposits = onSnapshot(depositsQuery, (querySnapshot) => {
-        const depositsData: Deposit[] = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            depositsData.push({ 
-              ...data, 
-              id: doc.id,
-              date: (data.date as Timestamp).toDate()
-            } as Deposit);
-        });
-        setDeposits(depositsData);
-    });
-
-    return () => {
-        unsubscribeClients();
-        unsubscribeDeposits();
-    }
-  }, []);
 
   useEffect(() => {
     if (watchedShopId) {
@@ -172,6 +118,14 @@ export default function DepositPage() {
   }
 
   const clientFound = !!watchedShopId && clients.some(c => c.shopId === watchedShopId);
+
+  if (dataLoading) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
+  }
 
   return (
     <div className="w-full h-full">
