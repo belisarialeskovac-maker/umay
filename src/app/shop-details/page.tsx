@@ -70,6 +70,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 import { useData } from "@/context/data-context"
+import { useAuth } from "@/context/auth-context"
 import withAuth from "@/components/with-auth"
 import type { Client } from "@/context/data-context"
 
@@ -110,6 +111,7 @@ function ShopDetailsPage() {
 
 
   const { clients, agents, loading: dataLoading } = useData();
+  const { user } = useAuth();
   const { toast } = useToast()
 
   const form = useForm<ClientFormData>({
@@ -284,6 +286,7 @@ function ShopDetailsPage() {
     label: format(new Date(0, i), 'MMMM'),
   }));
 
+  const canManage = user?.role === 'Admin' || user?.role === 'Superadmin';
 
   if (dataLoading) {
     return (
@@ -302,67 +305,69 @@ function ShopDetailsPage() {
             Manage your client information.
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>Add New Shop</Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Add New Shop</DialogTitle>
-              <DialogDescription>
-                Fill in the details below to add a new shop.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="shopId" render={({ field }) => (
-                    <FormItem><FormLabel>Shop ID</FormLabel><FormControl><Input placeholder="Enter Shop ID" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="clientName" render={({ field }) => (
-                    <FormItem><FormLabel>Client Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                 <FormField control={form.control} name="agent" render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Agent</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                        {displayAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                    </FormItem>
-                )} />
-                <FormField control={form.control} name="kycCompletedDate" render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>KYC Completed Date</FormLabel>
-                      <Popover><PopoverTrigger asChild><FormControl>
-                          <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>
-                            {field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                      </FormControl></PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent>
-                      </Popover><FormMessage />
-                    </FormItem>
-                )}/>
-                <FormField control={form.control} name="status" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select a status" /></SelectTrigger></FormControl>
-                        <SelectContent>{clientStatus.map((status) => (<SelectItem key={status} value={status}>{status}</SelectItem>))}</SelectContent>
-                      </Select><FormMessage />
-                    </FormItem>
-                )}/>
-                <FormField control={form.control} name="clientDetails" render={({ field }) => (
-                    <FormItem><FormLabel>Client Details</FormLabel><FormControl><Textarea placeholder="Enter client details..." {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <DialogFooter><Button type="submit">Add Shop</Button></DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+        {canManage && (
+            <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button>Add New Shop</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                <DialogTitle>Add New Shop</DialogTitle>
+                <DialogDescription>
+                    Fill in the details below to add a new shop.
+                </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField control={form.control} name="shopId" render={({ field }) => (
+                        <FormItem><FormLabel>Shop ID</FormLabel><FormControl><Input placeholder="Enter Shop ID" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="clientName" render={({ field }) => (
+                        <FormItem><FormLabel>Client Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="agent" render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Agent</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                            {displayAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )} />
+                    <FormField control={form.control} name="kycCompletedDate" render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                        <FormLabel>KYC Completed Date</FormLabel>
+                        <Popover><PopoverTrigger asChild><FormControl>
+                            <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>
+                                {field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                        </FormControl></PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent>
+                        </Popover><FormMessage />
+                        </FormItem>
+                    )}/>
+                    <FormField control={form.control} name="status" render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select a status" /></SelectTrigger></FormControl>
+                            <SelectContent>{clientStatus.map((status) => (<SelectItem key={status} value={status}>{status}</SelectItem>))}</SelectContent>
+                        </Select><FormMessage />
+                        </FormItem>
+                    )}/>
+                    <FormField control={form.control} name="clientDetails" render={({ field }) => (
+                        <FormItem><FormLabel>Client Details</FormLabel><FormControl><Textarea placeholder="Enter client details..." {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <DialogFooter><Button type="submit">Add Shop</Button></DialogFooter>
+                </form>
+                </Form>
+            </DialogContent>
+            </Dialog>
+        )}
       </div>
 
        <div className="flex flex-col sm:flex-row gap-4 mb-4">

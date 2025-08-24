@@ -68,6 +68,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useData } from "@/context/data-context"
+import { useAuth } from "@/context/auth-context"
 import type { Withdrawal } from "@/context/data-context"
 
 const paymentModes = ["Ewallet/Online Banking", "Crypto"] as const
@@ -100,6 +101,7 @@ export default function WithdrawalTab() {
   const [yearFilter, setYearFilter] = useState("all");
 
   const { withdrawals, clients, agents, loading: dataLoading } = useData();
+  const { user } = useAuth();
   const { toast } = useToast()
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -261,6 +263,7 @@ export default function WithdrawalTab() {
 
   const clientFound = !!watchedShopId && clients.some(c => c.shopId === watchedShopId);
   const clientFoundEdit = !!watchedEditShopId && clients.some(c => c.shopId === watchedEditShopId);
+  const canManage = user?.role === 'Admin' || user?.role === 'Superadmin';
 
   if (dataLoading) {
     return (
@@ -273,146 +276,148 @@ export default function WithdrawalTab() {
   return (
     <div className="w-full h-full">
       <div className="flex justify-end mb-6">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>Add New Withdrawal</Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Add New Withdrawal</DialogTitle>
-              <DialogDescription>
-                Fill in the details below to add a new withdrawal.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="shopId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Shop ID</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter Shop ID" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="clientName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Client Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Client Name (auto-filled)" {...field} disabled={clientFound}/>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField control={form.control} name="agent" render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Agent</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Agent (auto-filled)" {...field} disabled={clientFound}/>
-                      </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )} />
-                <FormField
-                  control={form.control}
-                  name="date"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
+        {canManage && (
+            <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button>Add New Withdrawal</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                <DialogTitle>Add New Withdrawal</DialogTitle>
+                <DialogDescription>
+                    Fill in the details below to add a new withdrawal.
+                </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                    control={form.control}
+                    name="shopId"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Shop ID</FormLabel>
+                        <FormControl>
+                            <Input placeholder="Enter Shop ID" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="clientName"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Client Name</FormLabel>
+                        <FormControl>
+                            <Input placeholder="Client Name (auto-filled)" {...field} disabled={clientFound}/>
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField control={form.control} name="agent" render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Agent</FormLabel>
+                        <FormControl>
+                            <Input placeholder="Agent (auto-filled)" {...field} disabled={clientFound}/>
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )} />
+                    <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                        <FormLabel>Date</FormLabel>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                            <FormControl>
+                                <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full pl-3 text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                )}
+                                >
+                                {field.value ? (
+                                    format(field.value, "PPP")
+                                ) : (
+                                    <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                            </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                initialFocus
+                            />
+                            </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="amount"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Amount</FormLabel>
+                        <FormControl>
+                            <Input type="number" placeholder="Enter amount" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="paymentMode"
+                    render={({ field }) => (
+                        <FormItem className="space-y-3">
+                        <FormLabel>Payment Mode</FormLabel>
+                        <FormControl>
+                            <RadioGroup
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            className="flex space-x-4"
                             >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Amount</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="Enter amount" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="paymentMode"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel>Payment Mode</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex space-x-4"
-                        >
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="Ewallet/Online Banking" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              E-wallet/Online Banking
-                            </FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="Crypto" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Crypto
-                            </FormLabel>
-                          </FormItem>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter>
-                  <Button type="submit">Add Withdrawal</Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                <RadioGroupItem value="Ewallet/Online Banking" />
+                                </FormControl>
+                                <FormLabel className="font-normal">
+                                E-wallet/Online Banking
+                                </FormLabel>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                <RadioGroupItem value="Crypto" />
+                                </FormControl>
+                                <FormLabel className="font-normal">
+                                Crypto
+                                </FormLabel>
+                            </FormItem>
+                            </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <DialogFooter>
+                    <Button type="submit">Add Withdrawal</Button>
+                    </DialogFooter>
+                </form>
+                </Form>
+            </DialogContent>
+            </Dialog>
+        )}
       </div>
 
        <div className="flex flex-col sm:flex-row gap-4 mb-4">
