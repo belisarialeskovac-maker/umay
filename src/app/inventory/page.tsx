@@ -25,7 +25,7 @@ function InventoryPage() {
   const { user, loading: authLoading } = useAuth();
   const { inventory: allDevices, agents, loading: dataLoading } = useData();
   
-  const [myDevices, setMyDevices] = useState<DeviceInventory[]>([]);
+  const [userVisibleDevices, setUserVisibleDevices] = useState<DeviceInventory[]>([]);
   const [filteredDevices, setFilteredDevices] = useState<DeviceInventory[]>([])
   const [agentStats, setAgentStats] = useState<AgentStats>({})
   const [searchTerm, setSearchTerm] = useState("")
@@ -33,49 +33,45 @@ function InventoryPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    if(!dataLoading && user) {
-      const devicesForUser = user.role === 'Agent' 
+    if (!dataLoading && user) {
+      const devices = user.role === 'Agent' 
         ? allDevices.filter(d => d.agent === user.name)
         : allDevices;
-      setMyDevices(devicesForUser);
+      setUserVisibleDevices(devices);
+    } else if (!dataLoading) {
+      setUserVisibleDevices(allDevices);
     }
   }, [allDevices, user, dataLoading]);
-
-  useEffect(() => {
-      setFilteredDevices(myDevices);
-      updateAgentStats(myDevices);
-  }, [myDevices]);
-
-
+  
   const agentNames = useMemo(() => agents.map(a => a.name), [agents]);
 
-  const updateAgentStats = (deviceData: DeviceInventory[]) => {
+  const updateAgentStats = useCallback((deviceData: DeviceInventory[]) => {
     const stats: AgentStats = {}
     deviceData.forEach((device) => {
       stats[device.agent] = (stats[device.agent] || 0) + 1
     })
     setAgentStats(stats)
-  }
+  }, []);
 
   useEffect(() => {
-    if (searchTerm.trim() === "") {
-      setFilteredDevices(myDevices)
+    const devicesToProcess = userVisibleDevices;
+    
+    const term = searchTerm.toLowerCase().trim();
+    if (term === "") {
+      setFilteredDevices(devicesToProcess);
     } else {
-      const term = searchTerm.toLowerCase()
-      const filtered = myDevices.filter((device) => {
-        return (
-          device.agent.toLowerCase().includes(term) ||
-          device.imei.toLowerCase().includes(term) ||
-          device.model.toLowerCase().includes(term) ||
-          device.color.toLowerCase().includes(term) ||
-          (device.appleIdUsername && device.appleIdUsername.toLowerCase().includes(term)) ||
-          (device.appleIdPassword && device.appleIdPassword.toLowerCase().includes(term)) ||
-          (device.remarks && device.remarks.toLowerCase().includes(term))
+      const filtered = devicesToProcess.filter((device) =>
+        Object.values(device).some(value => 
+          String(value).toLowerCase().includes(term)
         )
-      })
-      setFilteredDevices(filtered)
+      );
+      setFilteredDevices(filtered);
     }
-  }, [searchTerm, myDevices])
+    
+    // Only admins should see stats for all devices, agents see their own.
+    updateAgentStats(devicesToProcess);
+
+  }, [searchTerm, userVisibleDevices, updateAgentStats]);
 
   const addDevice = async (device: Omit<DeviceInventory, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) {
@@ -196,6 +192,8 @@ function InventoryPage() {
     )
   }
 
+  const isAgent = user?.role === 'Agent';
+
   return (
     <div className="w-full h-full">
       <div className="mb-6">
@@ -204,10 +202,10 @@ function InventoryPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6 grid w-full grid-cols-3">
+        <TabsList className="mb-6 grid w-full" style={{ gridTemplateColumns: isAgent ? '1fr 1fr' : '1fr 1fr 1fr' }}>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
           <TabsTrigger value="add-device">Add New Device</TabsTrigger>
-          <TabsTrigger value="stats">Agent Statistics</TabsTrigger>
+          {!isAgent && <TabsTrigger value="stats">Agent Statistics</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="inventory" className="space-y-4">
@@ -239,21 +237,21 @@ function InventoryPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="stats">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Agent Statistics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AgentStatistics agentStats={agentStats} />
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {!isAgent && (
+          <TabsContent value="stats">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle>Agent Statistics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AgentStatistics agentStats={agentStats} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )
 }
 
 export default withAuth(InventoryPage, ['Agent', 'Admin', 'Superadmin']);
-
-    
