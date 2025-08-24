@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
-import { CalendarIcon, X } from "lucide-react"
+import { CalendarIcon, X, MoreHorizontal, Edit, Trash2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -20,6 +20,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Form,
   FormControl,
@@ -50,7 +68,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, onSnapshot, query, where, Timestamp, doc, setDoc } from "firebase/firestore"
+import { collection, onSnapshot, query, where, Timestamp, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore"
 import { useAuth } from "@/context/auth-context"
 import withAuth from "@/components/with-auth"
 import { createUser } from "@/ai/flows/create-user-flow"
@@ -69,8 +87,8 @@ const formSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email.",
   }),
-  password: z.string().min(6, "Password must be at least 6 characters."),
-  confirmPassword: z.string().min(6, "Password must be at least 6 characters."),
+  password: z.string().min(6, "Password must be at least 6 characters.").optional(),
+  confirmPassword: z.string().min(6, "Password must be at least 6 characters.").optional(),
   agentType: z.enum(agentTypes),
   role: z.enum(roles).default("Agent"),
 }).refine(data => data.password === data.confirmPassword, {
@@ -79,7 +97,7 @@ const formSchema = z.object({
 });
 
 type AgentFormData = z.infer<typeof formSchema>
-type Agent = Omit<AgentFormData, 'password' | 'confirmPassword'> & { id: string }
+type Agent = Omit<AgentFormData, 'password' | 'confirmPassword'> & { id: string, uid: string }
 
 
 type Client = {
@@ -146,6 +164,10 @@ type Reward = {
 function AgentPerformancePage() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
+  const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
+  const [agentToEdit, setAgentToEdit] = useState<Agent | null>(null);
   const [agents, setAgents] = useState<Agent[]>([])
   const { toast } = useToast()
   
@@ -170,6 +192,10 @@ function AgentPerformancePage() {
       confirmPassword: "",
     },
   })
+  
+  const editForm = useForm<AgentFormData>({
+    resolver: zodResolver(formSchema),
+  });
 
   useEffect(() => {
     const q = query(collection(db, "agents"));
@@ -227,15 +253,17 @@ function AgentPerformancePage() {
 
 
   async function onSubmit(values: AgentFormData) {
+    if(!values.password) {
+        form.setError("password", {type: 'manual', message: "Password is required for new agents."})
+        return;
+    }
     try {
-      // 1. Create the user in Firebase Auth using the Genkit flow
       const { uid } = await createUser({ email: values.email, password: values.password });
 
       if (!uid) {
         throw new Error("User creation failed.");
       }
 
-      // 2. Create the agent document in Firestore with the UID as the document ID
       const agentData = {
         uid: uid,
         name: values.name,
@@ -261,6 +289,51 @@ function AgentPerformancePage() {
         variant: "destructive"
       })
     }
+  }
+
+  async function onEditSubmit(values: AgentFormData) {
+    if (!agentToEdit) return;
+    try {
+      const agentRef = doc(db, "agents", agentToEdit.uid);
+      const { password, confirmPassword, ...agentData } = values;
+      await updateDoc(agentRef, agentData as any); // Type assertion needed because updateDoc doesn't know about our refined schema
+      toast({ title: "Agent Updated", description: "Agent details have been updated." });
+      setEditOpen(false);
+      editForm.reset();
+    } catch(error: any) {
+        toast({ title: "Error", description: error.message || "Failed to update agent.", variant: "destructive" });
+    }
+  }
+
+  const handleDeleteAgent = async () => {
+    if (!agentToDelete) return;
+    try {
+        // We need a flow to delete the user from Auth. For now, we only delete from Firestore.
+        await deleteDoc(doc(db, "agents", agentToDelete.uid));
+        toast({
+            title: "Agent Deleted",
+            description: `${agentToDelete.name} has been removed from the database.`,
+            variant: "destructive"
+        })
+    } catch (error: any) {
+         toast({ title: "Error", description: error.message || "Failed to delete agent.", variant: "destructive" });
+    }
+    setDeleteAlertOpen(false);
+    setAgentToDelete(null);
+  }
+
+  const openEditDialog = (agent: Agent) => {
+    setAgentToEdit(agent);
+    editForm.reset({
+        ...agent,
+        dateHired: agent.dateHired
+    });
+    setEditOpen(true);
+  }
+  
+  const openDeleteDialog = (agent: Agent) => {
+    setAgentToDelete(agent);
+    setDeleteAlertOpen(true);
   }
   
   const handleRowClick = (agent: Agent) => {
@@ -596,16 +669,30 @@ function AgentPerformancePage() {
                 <TableHead>Date Hired</TableHead>
                 <TableHead>Agent Type</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {agents.map((agent) => (
-                <TableRow key={agent.id} onClick={() => handleRowClick(agent)} className="cursor-pointer">
-                  <TableCell>{agent.name}</TableCell>
-                  <TableCell>{agent.email}</TableCell>
-                  <TableCell>{format(agent.dateHired, "PPP")}</TableCell>
-                  <TableCell>{agent.agentType}</TableCell>
-                   <TableCell><Badge variant={agent.role === 'Superadmin' ? 'destructive' : agent.role === 'Admin' ? 'default' : 'secondary'}>{agent.role}</Badge></TableCell>
+                <TableRow key={agent.id}>
+                  <TableCell onClick={() => handleRowClick(agent)} className="cursor-pointer font-medium">{agent.name}</TableCell>
+                  <TableCell onClick={() => handleRowClick(agent)} className="cursor-pointer">{agent.email}</TableCell>
+                  <TableCell onClick={() => handleRowClick(agent)} className="cursor-pointer">{format(agent.dateHired, "PPP")}</TableCell>
+                  <TableCell onClick={() => handleRowClick(agent)} className="cursor-pointer">{agent.agentType}</TableCell>
+                   <TableCell onClick={() => handleRowClick(agent)} className="cursor-pointer"><Badge variant={agent.role === 'Superadmin' ? 'destructive' : agent.role === 'Admin' ? 'default' : 'secondary'}>{agent.role}</Badge></TableCell>
+                   <TableCell>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => openEditDialog(agent)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => openDeleteDialog(agent)} className="text-red-600"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -623,6 +710,70 @@ function AgentPerformancePage() {
           </div>
         </div>
       )}
+
+    <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+                <DialogTitle>Edit Agent</DialogTitle>
+                <DialogDescription>
+                    Update the details for {agentToEdit?.name}.
+                </DialogDescription>
+            </DialogHeader>
+            <Form {...editForm}>
+                <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+                     <FormField control={editForm.control} name="name" render={({ field }) => (
+                        <FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={editForm.control} name="email" render={({ field }) => (
+                        <FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={editForm.control} name="dateHired" render={({ field }) => (
+                        <FormItem className="flex flex-col"><FormLabel>Date Hired</FormLabel>
+                        <Popover><PopoverTrigger asChild><FormControl>
+                            <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                        </FormControl></PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} /></PopoverContent>
+                        </Popover><FormMessage /></FormItem>
+                     )} />
+                    <FormField control={editForm.control} name="agentType" render={({ field }) => (
+                        <FormItem><FormLabel>Agent Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>{agentTypes.map(t=><SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                        </Select><FormMessage /></FormItem>
+                     )} />
+                    <FormField control={editForm.control} name="role" render={({ field }) => (
+                        <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>{roles.map(r=><SelectItem key={r} value={r} disabled={user?.role !== 'Superadmin' && r === 'Superadmin'}>{r}</SelectItem>)}</SelectContent>
+                        </Select><FormMessage /></FormItem>
+                     )} />
+                    <DialogFooter>
+                        <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
+                        <Button type="submit">Save Changes</Button>
+                    </DialogFooter>
+                </form>
+            </Form>
+        </DialogContent>
+    </Dialog>
+
+    <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the agent's account and all associated data.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteAgent}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
     </div>
   )
 }
