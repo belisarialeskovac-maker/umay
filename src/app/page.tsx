@@ -8,6 +8,8 @@ import { Users, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { format, getMonth, getYear, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, Timestamp } from "firebase/firestore";
+import withAuth from '@/components/with-auth';
+import type { UserProfile } from '@/context/auth-context';
 
 type Client = {
   kycCompletedDate: Date;
@@ -18,7 +20,7 @@ type Transaction = {
   amount: number;
 };
 
-export default function Home() {
+function Home() {
   const [stats, setStats] = useState({
     clients: 0,
     deposits: 0,
@@ -150,3 +152,5 @@ export default function Home() {
     </div>
   );
 }
+
+export default withAuth(Home);

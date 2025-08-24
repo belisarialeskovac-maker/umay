@@ -31,29 +31,46 @@ import {
   UserCheck,
   Video,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/auth-context';
 
 const navItems = [
-  { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/videocall-template', icon: Video, label: 'Videocall Template' },
-  { href: '/client-details', icon: Users, label: 'Client Details' },
-  { href: '/order-request', icon: ClipboardList, label: 'Order Request' },
-  { href: '/deposit', icon: ArrowDownToLine, label: 'Deposit' },
-  { href: '/withdrawal', icon: ArrowUpFromLine, label: 'Withdrawal' },
-  { href: '/team-performance', icon: AreaChart, label: 'Team Performance' },
-  { href: '/agent-performance', icon: UserCheck, label: 'Agent Performance' },
-  { href: '/reporting', icon: FileText, label: 'Reporting' },
-  { href: '/daily-added', icon: CalendarPlus, label: 'Daily Added' },
-  { href: '/inventory', icon: Boxes, label: 'Inventory' },
-  { href: '#', icon: Megaphone, label: 'Announcement' },
+  { href: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['Agent', 'Admin', 'Superadmin'] },
+  { href: '/videocall-template', icon: Video, label: 'Videocall Template', roles: ['Agent', 'Admin', 'Superadmin'] },
+  { href: '/client-details', icon: Users, label: 'Client Details', roles: ['Agent', 'Admin', 'Superadmin'] },
+  { href: '/order-request', icon: ClipboardList, label: 'Order Request', roles: ['Agent', 'Admin', 'Superadmin'] },
+  { href: '/deposit', icon: ArrowDownToLine, label: 'Deposit', roles: ['Agent', 'Admin', 'Superadmin'] },
+  { href: '/withdrawal', icon: ArrowUpFromLine, label: 'Withdrawal', roles: ['Agent', 'Admin', 'Superadmin'] },
+  { href: '/team-performance', icon: AreaChart, label: 'Team Performance', roles: ['Admin', 'Superadmin'] },
+  { href: '/agent-performance', icon: UserCheck, label: 'Agent Performance', roles: ['Admin', 'Superadmin'] },
+  { href: '/reporting', icon: FileText, label: 'Reporting', roles: ['Agent', 'Admin', 'Superadmin'] },
+  { href: '/daily-added', icon: CalendarPlus, label: 'Daily Added', roles: ['Agent', 'Admin', 'Superadmin'] },
+  { href: '/inventory', icon: Boxes, label: 'Inventory', roles: ['Admin', 'Superadmin'] },
+  { href: '#', icon: Megaphone, label: 'Announcement', roles: ['Agent', 'Admin', 'Superadmin'] },
 ];
 
 const settingsNav = { href: '#', icon: Settings, label: 'Settings' };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user, logout, loading } = useAuth();
+  
+  if (loading) {
+      return (
+          <div className="flex h-screen w-full items-center justify-center">
+              <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+          </div>
+      )
+  }
+
+  if (!user) {
+    return <main className="flex-1">{children}</main>;
+  }
+  
+  const userInitials = user.name?.split(' ').map(n => n[0]).join('') || 'U';
 
   return (
     <SidebarProvider>
@@ -71,7 +88,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {navItems.map((item) => (
+            {navItems.filter(item => item.roles.includes(user.role)).map((item) => (
               <SidebarMenuItem key={item.label}>
                 <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
                   <Link href={item.href}>
@@ -100,15 +117,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="flex items-center gap-3">
                 <Avatar className="size-8">
                   <AvatarImage src="https://placehold.co/40x40.png" alt="User Avatar" data-ai-hint="person portrait" />
-                  <AvatarFallback>JD</AvatarFallback>
+                  <AvatarFallback>{userInitials}</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-                  <span className="text-sm font-semibold text-foreground">John Doe</span>
-                  <span className="text-xs text-muted-foreground">john.doe@example.com</span>
+                  <span className="text-sm font-semibold text-foreground">{user.name}</span>
+                  <span className="text-xs text-muted-foreground">{user.email}</span>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" className="group-data-[collapsible=icon]:hidden">
-                <ChevronRight className="size-4" />
+              <Button variant="ghost" size="icon" className="group-data-[collapsible=icon]:hidden" onClick={logout}>
+                <LogOut className="size-4" />
               </Button>
             </div>
           </div>

@@ -51,8 +51,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, onSnapshot, query, where, Timestamp } from "firebase/firestore"
+import { useAuth } from "@/context/auth-context"
+import withAuth from "@/components/with-auth"
 
 const agentTypes = ["Regular", "Elite", "Spammer", "Model", "Team Leader"] as const
+const roles = ["Agent", "Admin", "Superadmin"] as const;
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -65,6 +68,7 @@ const formSchema = z.object({
     message: "Please enter a valid email.",
   }),
   agentType: z.enum(agentTypes),
+  role: z.enum(roles).default("Agent"),
 })
 
 type Agent = z.infer<typeof formSchema> & { id: string }
@@ -130,7 +134,8 @@ type Reward = {
 }
 
 
-export default function AgentPerformancePage() {
+function AgentPerformancePage() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false)
   const [agents, setAgents] = useState<Agent[]>([])
   const { toast } = useToast()
@@ -186,9 +191,9 @@ export default function AgentPerformancePage() {
             rewards: setAgentRewards
         };
 
-        collections.forEach(col => {
+        const unsubscribers = collections.map(col => {
             const q = query(collection(db, col), where("agent", "==", selectedAgent.name));
-            const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            return onSnapshot(q, (querySnapshot) => {
                 const data: any[] = [];
                 querySnapshot.forEach((doc) => {
                     const docData = doc.data();
@@ -203,8 +208,9 @@ export default function AgentPerformancePage() {
                 });
                 setters[col](data);
             });
-            return () => unsubscribe();
         });
+        
+        return () => unsubscribers.forEach(unsub => unsub());
     }
   }, [selectedAgent]);
 
@@ -235,6 +241,8 @@ export default function AgentPerformancePage() {
   const handleCloseDetails = () => {
     setSelectedAgent(null);
   }
+  
+  const canRegisterAgent = user?.role === 'Admin' || user?.role === 'Superadmin';
 
   return (
     <div className="w-full h-full">
@@ -245,117 +253,143 @@ export default function AgentPerformancePage() {
             Monitor and manage your agents. Click on an agent to view their details.
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>Register Agent</Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Register New Agent</DialogTitle>
-              <DialogDescription>
-                Fill in the details below to add a new agent.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input placeholder="john.doe@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="dateHired"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Date Hired</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) =>
-                              date > new Date() || date < new Date("1900-01-01")
-                            }
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="agentType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Agent Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+        {canRegisterAgent && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>Register Agent</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Register New Agent</DialogTitle>
+                <DialogDescription>
+                  Fill in the details below to add a new agent.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select an agent type" />
-                          </SelectTrigger>
+                          <Input placeholder="John Doe" {...field} />
                         </FormControl>
-                        <SelectContent>
-                          {agentTypes.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter>
-                  <Button type="submit">Register</Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input placeholder="john.doe@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="dateHired"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Date Hired</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              disabled={(date) =>
+                                date > new Date() || date < new Date("1900-01-01")
+                              }
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="agentType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Agent Type</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select an agent type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {agentTypes.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                   <FormField
+                    control={form.control}
+                    name="role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Role</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a role" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {roles.map((role) => (
+                              <SelectItem key={role} value={role} disabled={user?.role !== 'Superadmin' && role === 'Superadmin'}>
+                                {role}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <Button type="submit">Register</Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {selectedAgent ? (
@@ -506,6 +540,7 @@ export default function AgentPerformancePage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Date Hired</TableHead>
                 <TableHead>Agent Type</TableHead>
+                <TableHead>Role</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -515,6 +550,7 @@ export default function AgentPerformancePage() {
                   <TableCell>{agent.email}</TableCell>
                   <TableCell>{format(agent.dateHired, "PPP")}</TableCell>
                   <TableCell>{agent.agentType}</TableCell>
+                   <TableCell><Badge variant={agent.role === 'Superadmin' ? 'destructive' : agent.role === 'Admin' ? 'default' : 'secondary'}>{agent.role}</Badge></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -535,3 +571,6 @@ export default function AgentPerformancePage() {
     </div>
   )
 }
+
+
+export default withAuth(AgentPerformancePage, ['Admin', 'Superadmin']);
