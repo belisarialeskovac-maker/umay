@@ -4,10 +4,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { z } from 'zod';
 import { format, isToday, isThisMonth } from 'date-fns';
-import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays, Trash2, BarChart, Loader2 } from 'lucide-react';
+import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays, BarChart, Loader2 } from 'lucide-react';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { db } from "@/lib/firebase";
-import { collection, addDoc, deleteDoc, doc, getDocs } from "firebase/firestore";
+import { collection, addDoc } from "firebase/firestore";
 
 import { Button } from '@/components/ui/button';
 import {
@@ -21,17 +21,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/context/auth-context';
 import { useData } from '@/context/data-context';
@@ -204,30 +193,6 @@ function DailyAddedPage() {
     }
   }
 
-  const handleClearData = async () => {
-    try {
-        const querySnapshot = await getDocs(collection(db, 'dailyAddedClients'));
-        const deletePromises: Promise<void>[] = [];
-        querySnapshot.forEach((docSnapshot) => {
-            deletePromises.push(deleteDoc(doc(db, 'dailyAddedClients', docSnapshot.id)));
-        });
-        await Promise.all(deletePromises);
-
-        setSessionClients([]);
-        toast({
-            title: "Data Cleared",
-            description: "All daily added client data has been cleared from the database."
-        })
-    } catch (error) {
-        console.error("Error clearing data: ", error);
-        toast({
-            title: "Error",
-            description: "Failed to clear client data.",
-            variant: "destructive"
-        })
-    }
-  }
-  
   if (dataLoading) {
     return (
         <div className="flex items-center justify-center h-full">
@@ -245,25 +210,6 @@ function DailyAddedPage() {
                 Track and manage daily client entries and statistics.
             </p>
             </div>
-            <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button variant="destructive">
-                        <Trash2 className="mr-2 h-4 w-4" /> Clear All Data
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete all daily added client data from your database.
-                    </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearData}>Continue</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
       
         <Tabs defaultValue="dashboard">
@@ -422,5 +368,3 @@ function DailyAddedPage() {
 }
 
 export default withAuth(DailyAddedPage, ['Agent', 'Admin', 'Superadmin']);
-
-    
