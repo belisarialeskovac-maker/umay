@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, isToday, isThisMonth } from 'date-fns';
-import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays, Trash2, BarChart } from 'lucide-react';
+import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays, Trash2, BarChart, Loader2 } from 'lucide-react';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { db } from "@/lib/firebase";
 import { collection, addDoc, onSnapshot, query, deleteDoc, doc, getDocs, Timestamp } from "firebase/firestore";
@@ -71,6 +71,7 @@ function DailyAddedPage() {
   const [allClients, setAllClients] = useState<Client[]>([]);
   const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([]);
   const [pastedDetails, setPastedDetails] = useState('');
+  const [isAddingClient, setIsAddingClient] = useState(false);
   const { toast } = useToast();
 
   const [dailyCount, setDailyCount] = useState(0);
@@ -164,6 +165,8 @@ function DailyAddedPage() {
 
 
   const handleAddClient = async () => {
+    if (isAddingClient) return;
+
     if (!user) {
         toast({
             title: 'Not Logged In',
@@ -182,6 +185,7 @@ function DailyAddedPage() {
         return;
     }
     
+    setIsAddingClient(true);
     try {
         const nameRegex = /(?:client name|name):\s*(.*)/i;
         const ageRegex = /age:\s*(\d+)/i;
@@ -242,6 +246,8 @@ function DailyAddedPage() {
             description: error.message || 'Please ensure the pasted text is in a supported format.',
             variant: 'destructive',
         });
+    } finally {
+        setIsAddingClient(false);
     }
   }
 
@@ -372,8 +378,17 @@ function DailyAddedPage() {
                                     onChange={(e) => setPastedDetails(e.target.value)}
                                 />
                             </div>
-                            <Button onClick={handleAddClient} className='w-full'>
-                                <UserPlus className="mr-2 h-4 w-4" /> 2. Parse and Add Client
+                            <Button onClick={handleAddClient} disabled={isAddingClient} className='w-full'>
+                                {isAddingClient ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Adding Client...
+                                    </>
+                                ) : (
+                                    <>
+                                        <UserPlus className="mr-2 h-4 w-4" /> 2. Parse and Add Client
+                                    </>
+                                )}
                             </Button>
                         </div>
                     </div>
@@ -446,5 +461,3 @@ function DailyAddedPage() {
 }
 
 export default withAuth(DailyAddedPage, ['Agent', 'Admin', 'Superadmin']);
-
-    
