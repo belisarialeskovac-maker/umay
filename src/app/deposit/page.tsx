@@ -5,8 +5,8 @@ import { useState, useEffect, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { format } from "date-fns"
-import { CalendarIcon, Loader2, MoreHorizontal, Edit, Trash2 } from "lucide-react"
+import { format, getMonth, getYear } from "date-fns"
+import { CalendarIcon, Loader2, MoreHorizontal, Edit, Trash2, Search } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
 
@@ -58,6 +58,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useData } from "@/context/data-context"
@@ -88,8 +95,12 @@ function DepositPage() {
   const [depositToDelete, setDepositToDelete] = useState<Deposit | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [agentFilter, setAgentFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState("all");
+  const [yearFilter, setYearFilter] = useState("all");
   
-  const { deposits, clients, loading: dataLoading } = useData();
+  const { deposits, clients, agents, loading: dataLoading } = useData();
   const { toast } = useToast()
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -107,14 +118,38 @@ function DepositPage() {
   const editForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema)
   });
+  
+  const filteredDeposits = useMemo(() => {
+    return deposits.filter(deposit => {
+        const lowercasedTerm = searchTerm.toLowerCase();
+        const matchesSearch = searchTerm.trim() === '' ||
+            deposit.shopId.toLowerCase().includes(lowercasedTerm) ||
+            deposit.clientName.toLowerCase().includes(lowercasedTerm) ||
+            deposit.agent.toLowerCase().includes(lowercasedTerm) ||
+            deposit.paymentMode.toLowerCase().includes(lowercasedTerm) ||
+            String(deposit.amount).includes(lowercasedTerm);
+
+        const matchesAgent = agentFilter === 'all' || deposit.agent === agentFilter;
+        
+        const depositDate = deposit.date;
+        const matchesMonth = monthFilter === 'all' || getMonth(depositDate) === parseInt(monthFilter);
+        const matchesYear = yearFilter === 'all' || getYear(depositDate) === parseInt(yearFilter);
+
+        return matchesSearch && matchesAgent && matchesMonth && matchesYear;
+    });
+  }, [deposits, searchTerm, agentFilter, monthFilter, yearFilter]);
 
   const paginatedDeposits = useMemo(() => {
     const startIndex = (currentPage - 1) * DEPOSITS_PER_PAGE;
     const endIndex = startIndex + DEPOSITS_PER_PAGE;
-    return deposits.slice(startIndex, endIndex);
-  }, [deposits, currentPage]);
+    return filteredDeposits.slice(startIndex, endIndex);
+  }, [filteredDeposits, currentPage]);
   
-  const totalPages = Math.ceil(deposits.length / DEPOSITS_PER_PAGE);
+  const totalPages = Math.ceil(filteredDeposits.length / DEPOSITS_PER_PAGE);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, agentFilter, monthFilter, yearFilter]);
 
   const watchedShopId = form.watch("shopId");
   const watchedEditShopId = editForm.watch("shopId");
@@ -212,6 +247,16 @@ function DepositPage() {
     setDepositToDelete(deposit);
     setDeleteAlertOpen(true);
   }
+
+  const availableYears = useMemo(() => {
+    const years = new Set(deposits.map(d => getYear(d.date)));
+    return Array.from(years).sort((a,b) => b - a);
+  }, [deposits]);
+  
+  const months = Array.from({ length: 12 }, (_, i) => ({
+    value: i,
+    label: format(new Date(0, i), 'MMMM'),
+  }));
 
   const clientFound = !!watchedShopId && clients.some(c => c.shopId === watchedShopId);
   const clientFoundEdit = !!watchedEditShopId && clients.some(c => c.shopId === watchedEditShopId);
@@ -374,7 +419,36 @@ function DepositPage() {
           </DialogContent>
         </Dialog>
       </div>
-      {deposits.length > 0 ? (
+
+      <div className="flex flex-col sm:flex-row gap-4 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search deposits..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        </div>
+        <Select value={agentFilter} onValueChange={setAgentFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by agent" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Agents</SelectItem>
+                {agents.map(agent => (<SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>))}
+            </SelectContent>
+        </Select>
+        <Select value={monthFilter} onValueChange={setMonthFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by month" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Months</SelectItem>
+                {months.map(m => (<SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>))}
+            </SelectContent>
+        </Select>
+        <Select value={yearFilter} onValueChange={setYearFilter}>
+            <SelectTrigger className="w-full sm:w-[120px]"><SelectValue placeholder="Filter by year" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Years</SelectItem>
+                {availableYears.map(y => (<SelectItem key={y} value={String(y)}>{y}</SelectItem>))}
+            </SelectContent>
+        </Select>
+      </div>
+
+      {paginatedDeposits.length > 0 ? (
         <>
         <div className="rounded-lg border bg-card">
           <Table>
@@ -414,7 +488,10 @@ function DepositPage() {
             </TableBody>
           </Table>
         </div>
-        <div className="flex items-center justify-end mt-4">
+        <div className="flex items-center justify-between mt-4">
+            <div className="text-sm text-muted-foreground">
+                Showing {paginatedDeposits.length} of {filteredDeposits.length} deposit(s).
+            </div>
             <div className="flex items-center space-x-2">
                 <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button>
                 <span>Page {currentPage} of {totalPages}</span>
@@ -426,10 +503,10 @@ function DepositPage() {
         <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] p-6">
           <div className="text-center">
             <h2 className="text-2xl font-bold tracking-tight text-foreground">
-              No Deposits Added
+              No Deposits Found
             </h2>
             <p className="text-muted-foreground mt-2">
-              Add a new deposit to see the details here.
+              Try adjusting your search or filters.
             </p>
           </div>
         </div>
