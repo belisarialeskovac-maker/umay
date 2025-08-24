@@ -2,10 +2,13 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { format, isToday, isThisMonth, startOfToday } from "date-fns"
-import { Loader2, Plus, Trash2, ChevronUp, ChevronDown, FileText, RefreshCw, Languages, Copy, Download, Upload, Calendar, BarChart, Banknote } from "lucide-react"
+import { Loader2, Plus, Trash2, ChevronUp, ChevronDown, FileText, RefreshCw, Languages, Copy, Download, Upload, Calendar, BarChart, Banknote, ClipboardList } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { doc, setDoc, getDoc, onSnapshot, Timestamp } from "firebase/firestore"
+import { doc, setDoc, getDoc, onSnapshot, Timestamp, collection, addDoc } from "firebase/firestore"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -18,6 +21,23 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/context/auth-context"
@@ -49,6 +69,12 @@ type ClientInformation = {
     isCollapsed: boolean;
 };
 
+const orderFormSchema = z.object({
+  shopId: z.string().min(1, "A shop ID is required."),
+  location: z.string().min(2, "Location must be at least 2 characters."),
+  price: z.coerce.number().positive("Price must be a positive number."),
+  remarks: z.string(),
+})
 
 function ProfilePage() {
   const { user, loading: authLoading } = useAuth();
@@ -77,6 +103,7 @@ function ProfilePage() {
   const [clientInfoList, setClientInfoList] = useState<ClientInformation[]>([]);
   const [generatedReport, setGeneratedReport] = useState("");
   const [isReportCardCollapsed, setReportCardCollapsed] = useState(true);
+  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const { toast } = useToast();
   const [isReportDataLoading, setIsReportDataLoading] = useState(true);
 
@@ -85,6 +112,41 @@ function ProfilePage() {
     const todayStr = format(startOfToday(), 'yyyy-MM-dd');
     return doc(db, 'dailyReports', `${user.uid}_${todayStr}`);
   }, [user]);
+
+  const orderForm = useForm<z.infer<typeof orderFormSchema>>({
+    resolver: zodResolver(orderFormSchema),
+    defaultValues: {
+      shopId: "",
+      location: "",
+      price: 0,
+      remarks: "",
+    },
+  })
+
+  async function onOrderSubmit(values: z.infer<typeof orderFormSchema>) {
+    if(!user) return;
+    const newOrder = {
+        ...values,
+        agent: user.name,
+        status: 'Pending',
+    }
+    try {
+      await addDoc(collection(db, "orders"), newOrder);
+      toast({
+        title: "Order Requested",
+        description: `Successfully requested order for Shop ID ${values.shopId}. Admin will be notified.`,
+      })
+      setOrderDialogOpen(false)
+      orderForm.reset()
+    } catch (error) {
+      console.error("Error adding order: ", error);
+      toast({
+        title: "Error",
+        description: "Failed to request order.",
+        variant: "destructive"
+      });
+    }
+  }
 
   useEffect(() => {
     if (!user || !getReportDocRef()) {
@@ -324,6 +386,91 @@ function ProfilePage() {
             View your personal records and performance metrics.
             </p>
         </div>
+        <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
+            <DialogTrigger asChild>
+                <Button><ClipboardList className="mr-2 h-4 w-4" /> Request an Order</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Request New Order</DialogTitle>
+                    <DialogDescription>
+                        Fill in the details below to request a new order. An admin will review it.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...orderForm}>
+                <form onSubmit={orderForm.handleSubmit(onOrderSubmit)} className="space-y-4">
+                    <FormField
+                        control={orderForm.control}
+                        name="shopId"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Shop ID</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!user}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a Shop ID" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                {agentClients.map((client) => (
+                                    <SelectItem key={client.id} value={client.shopId}>
+                                    {client.shopId} ({client.clientName})
+                                    </SelectItem>
+                                ))}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={orderForm.control}
+                        name="location"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Location</FormLabel>
+                            <FormControl>
+                                <Input placeholder="Enter location" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={orderForm.control}
+                        name="price"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Price</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="Enter price" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={orderForm.control}
+                        name="remarks"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Remarks</FormLabel>
+                            <FormControl>
+                                <Textarea placeholder="Enter remarks (optional)" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <DialogFooter>
+                        <Button type="submit" disabled={orderForm.formState.isSubmitting}>
+                           {orderForm.formState.isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Submitting...</> : "Submit Request"}
+                        </Button>
+                    </DialogFooter>
+                </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
       </div>
 
       <Card>
