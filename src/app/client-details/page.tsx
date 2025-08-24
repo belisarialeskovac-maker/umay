@@ -5,10 +5,10 @@ import { useState, useEffect, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { format } from "date-fns"
-import { CalendarIcon, Loader2, MoreHorizontal, Edit, Trash2 } from "lucide-react"
+import { format, getMonth, getYear, setMonth, setYear } from "date-fns"
+import { CalendarIcon, Loader2, MoreHorizontal, Edit, Trash2, Search } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -94,12 +94,20 @@ function ClientDetailsPage() {
   const [open, setOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false)
+  const [bulkDeleteAlertOpen, setBulkDeleteAlertOpen] = useState(false)
+  const [bulkStatusDialogOpen, setBulkStatusDialogOpen] = useState(false)
   
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [selectedClients, setSelectedClients] = useState<string[]>([])
   
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [agentFilter, setAgentFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState("all");
+  const [yearFilter, setYearFilter] = useState("all");
+  const [newBulkStatus, setNewBulkStatus] = useState<typeof clientStatus[number] | ''>('');
+
 
   const { clients, agents, loading: dataLoading } = useData();
   const { toast } = useToast()
@@ -119,13 +127,38 @@ function ClientDetailsPage() {
     resolver: zodResolver(formSchema)
   });
   
+  const filteredClients = useMemo(() => {
+    return clients.filter(client => {
+        const lowercasedTerm = searchTerm.toLowerCase();
+        const matchesSearch = searchTerm.trim() === '' ||
+            client.shopId.toLowerCase().includes(lowercasedTerm) ||
+            client.clientName.toLowerCase().includes(lowercasedTerm) ||
+            client.agent.toLowerCase().includes(lowercasedTerm) ||
+            client.status.toLowerCase().includes(lowercasedTerm) ||
+            client.clientDetails.toLowerCase().includes(lowercasedTerm);
+
+        const matchesAgent = agentFilter === 'all' || client.agent === agentFilter;
+        
+        const clientDate = client.kycCompletedDate;
+        const matchesMonth = monthFilter === 'all' || getMonth(clientDate) === parseInt(monthFilter);
+        const matchesYear = yearFilter === 'all' || getYear(clientDate) === parseInt(yearFilter);
+
+        return matchesSearch && matchesAgent && matchesMonth && matchesYear;
+    });
+  }, [clients, searchTerm, agentFilter, monthFilter, yearFilter]);
+
   const paginatedClients = useMemo(() => {
     const startIndex = (currentPage - 1) * CLIENTS_PER_PAGE;
     const endIndex = startIndex + CLIENTS_PER_PAGE;
-    return clients.slice(startIndex, endIndex);
-  }, [clients, currentPage]);
+    return filteredClients.slice(startIndex, endIndex);
+  }, [filteredClients, currentPage]);
   
-  const totalPages = Math.ceil(clients.length / CLIENTS_PER_PAGE);
+  const totalPages = Math.ceil(filteredClients.length / CLIENTS_PER_PAGE);
+
+  useEffect(() => {
+    setCurrentPage(1); // Reset to first page on filter change
+    setSelectedClients([]); // Clear selections on filter change
+  }, [searchTerm, agentFilter, monthFilter, yearFilter]);
 
   async function onSubmit(values: ClientFormData) {
     try {
@@ -174,6 +207,40 @@ function ClientDetailsPage() {
     setClientToDelete(null);
   }
 
+  const handleBulkDelete = async () => {
+    const batch = writeBatch(db);
+    selectedClients.forEach(id => {
+      batch.delete(doc(db, "clients", id));
+    });
+    try {
+      await batch.commit();
+      toast({ title: "Clients Deleted", description: `${selectedClients.length} clients have been deleted.` });
+      setSelectedClients([]);
+    } catch(error: any) {
+      toast({ title: "Error", description: "Failed to delete selected clients.", variant: "destructive" });
+    }
+    setBulkDeleteAlertOpen(false);
+  }
+  
+  const handleBulkStatusChange = async () => {
+    if (!newBulkStatus) {
+      toast({ title: "No Status Selected", description: "Please select a status to apply.", variant: "destructive" });
+      return;
+    }
+    const batch = writeBatch(db);
+    selectedClients.forEach(id => {
+      batch.update(doc(db, "clients", id), { status: newBulkStatus });
+    });
+     try {
+      await batch.commit();
+      toast({ title: "Status Updated", description: `Status for ${selectedClients.length} clients has been updated to ${newBulkStatus}.` });
+      setSelectedClients([]);
+    } catch(error: any) {
+      toast({ title: "Error", description: "Failed to update client statuses.", variant: "destructive" });
+    }
+    setBulkStatusDialogOpen(false);
+    setNewBulkStatus('');
+  }
 
   const openEditDialog = (client: Client) => {
     setClientToEdit(client);
@@ -204,6 +271,17 @@ function ClientDetailsPage() {
         setSelectedClients(prev => prev.filter(id => id !== clientId));
     }
   }
+
+  const availableYears = useMemo(() => {
+    const years = new Set(clients.map(c => getYear(c.kycCompletedDate)));
+    return Array.from(years).sort((a,b) => b - a);
+  }, [clients]);
+  
+  const months = Array.from({ length: 12 }, (_, i) => ({
+    value: i,
+    label: format(new Date(0, i), 'MMMM'),
+  }));
+
 
   if (dataLoading) {
     return (
@@ -284,7 +362,45 @@ function ClientDetailsPage() {
           </DialogContent>
         </Dialog>
       </div>
-      {clients.length > 0 ? (
+
+       <div className="flex flex-col sm:flex-row gap-4 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search clients..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        </div>
+        <Select value={agentFilter} onValueChange={setAgentFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by agent" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Agents</SelectItem>
+                {agents.map(agent => (<SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>))}
+            </SelectContent>
+        </Select>
+        <Select value={monthFilter} onValueChange={setMonthFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by month" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Months</SelectItem>
+                {months.map(m => (<SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>))}
+            </SelectContent>
+        </Select>
+        <Select value={yearFilter} onValueChange={setYearFilter}>
+            <SelectTrigger className="w-full sm:w-[120px]"><SelectValue placeholder="Filter by year" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Years</SelectItem>
+                {availableYears.map(y => (<SelectItem key={y} value={String(y)}>{y}</SelectItem>))}
+            </SelectContent>
+        </Select>
+      </div>
+      
+      {selectedClients.length > 0 && (
+        <div className="flex items-center gap-4 mb-4 p-3 bg-muted rounded-lg">
+            <p className="text-sm font-medium">{selectedClients.length} client(s) selected.</p>
+            <Button size="sm" variant="destructive" onClick={() => setBulkDeleteAlertOpen(true)}>Delete Selected</Button>
+            <Button size="sm" variant="outline" onClick={() => setBulkStatusDialogOpen(true)}>Change Status</Button>
+        </div>
+      )}
+
+
+      {paginatedClients.length > 0 ? (
         <>
         <div className="rounded-lg border bg-card">
           <Table>
@@ -330,7 +446,7 @@ function ClientDetailsPage() {
         </div>
         <div className="flex items-center justify-between mt-4">
             <div className="text-sm text-muted-foreground">
-                {selectedClients.length} of {clients.length} row(s) selected.
+                Showing {paginatedClients.length} of {filteredClients.length} client(s).
             </div>
             <div className="flex items-center space-x-2">
                 <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button>
@@ -342,8 +458,8 @@ function ClientDetailsPage() {
       ) : (
         <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] p-6">
           <div className="text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">No Clients Added</h2>
-            <p className="text-muted-foreground mt-2">Add a new client to see their details here.</p>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">No Clients Found</h2>
+            <p className="text-muted-foreground mt-2">Try adjusting your search or filters.</p>
           </div>
         </div>
       )}
@@ -412,7 +528,7 @@ function ClientDetailsPage() {
         </DialogContent>
     </Dialog>
 
-    {/* Delete Dialog */}
+    {/* Single Delete Dialog */}
     <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
         <AlertDialogContent>
             <AlertDialogHeader>
@@ -427,6 +543,46 @@ function ClientDetailsPage() {
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
+    
+    {/* Bulk Delete Dialog */}
+     <AlertDialog open={bulkDeleteAlertOpen} onOpenChange={setBulkDeleteAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the selected {selectedClients.length} client records.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleBulkDelete}>Delete All</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
+    {/* Bulk Status Change Dialog */}
+    <Dialog open={bulkStatusDialogOpen} onOpenChange={setBulkStatusDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Change Status for Selected Clients</DialogTitle>
+                <DialogDescription>Select a new status to apply to the {selectedClients.length} selected clients.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <Select value={newBulkStatus} onValueChange={(value: typeof clientStatus[number]) => setNewBulkStatus(value)}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select new status..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {clientStatus.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <DialogFooter>
+                <Button variant="ghost" onClick={() => setBulkStatusDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleBulkStatusChange} disabled={!newBulkStatus}>Apply Status</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 
     </div>
   )
