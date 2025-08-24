@@ -50,9 +50,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, onSnapshot, query, where, Timestamp } from "firebase/firestore"
+import { collection, addDoc, onSnapshot, query, where, Timestamp, doc, setDoc } from "firebase/firestore"
 import { useAuth } from "@/context/auth-context"
 import withAuth from "@/components/with-auth"
+import { createUser } from "@/ai/flows/create-user-flow"
+
 
 const agentTypes = ["Regular", "Elite", "Spammer", "Model", "Team Leader"] as const
 const roles = ["Agent", "Admin", "Superadmin"] as const;
@@ -67,11 +69,18 @@ const formSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email.",
   }),
+  password: z.string().min(6, "Password must be at least 6 characters."),
+  confirmPassword: z.string().min(6, "Password must be at least 6 characters."),
   agentType: z.enum(agentTypes),
   role: z.enum(roles).default("Agent"),
-})
+}).refine(data => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+});
 
-type Agent = z.infer<typeof formSchema> & { id: string }
+type AgentFormData = z.infer<typeof formSchema>
+type Agent = Omit<AgentFormData, 'password' | 'confirmPassword'> & { id: string }
+
 
 type Client = {
     id: string;
@@ -152,11 +161,13 @@ function AgentPerformancePage() {
   const [agentRewards, setAgentRewards] = useState<Reward[]>([]);
 
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<AgentFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       email: "",
+      password: "",
+      confirmPassword: "",
     },
   })
 
@@ -215,20 +226,38 @@ function AgentPerformancePage() {
   }, [selectedAgent]);
 
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: AgentFormData) {
     try {
-      await addDoc(collection(db, "agents"), values);
+      // 1. Create the user in Firebase Auth using the Genkit flow
+      const { uid } = await createUser({ email: values.email, password: values.password });
+
+      if (!uid) {
+        throw new Error("User creation failed.");
+      }
+
+      // 2. Create the agent document in Firestore with the UID as the document ID
+      const agentData = {
+        uid: uid,
+        name: values.name,
+        email: values.email,
+        agentType: values.agentType,
+        role: values.role,
+        dateHired: values.dateHired,
+      };
+
+      await setDoc(doc(db, "agents", uid), agentData);
+      
       toast({
         title: "Agent Registered",
-        description: `Successfully registered ${values.name}.`,
+        description: `Successfully registered ${values.name} with a login account.`,
       })
       setOpen(false)
       form.reset()
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding agent: ", error);
       toast({
         title: "Error",
-        description: "Failed to register agent.",
+        description: error.message || "Failed to register agent.",
         variant: "destructive"
       })
     }
@@ -262,7 +291,7 @@ function AgentPerformancePage() {
               <DialogHeader>
                 <DialogTitle>Register New Agent</DialogTitle>
                 <DialogDescription>
-                  Fill in the details below to add a new agent.
+                  Fill in the details below to add a new agent and create their login account.
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
@@ -288,6 +317,32 @@ function AgentPerformancePage() {
                         <FormLabel>Email</FormLabel>
                         <FormControl>
                           <Input placeholder="john.doe@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="••••••••" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="••••••••" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -574,3 +629,5 @@ function AgentPerformancePage() {
 
 
 export default withAuth(AgentPerformancePage, ['Admin', 'Superadmin']);
+
+    
