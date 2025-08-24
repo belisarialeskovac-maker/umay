@@ -3,7 +3,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getAuth, onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { app, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
@@ -33,6 +33,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
       if (firebaseUser) {
+        setLoading(true); // Set loading while we fetch profile
         try {
           const agentRef = doc(db, 'agents', firebaseUser.uid);
           const agentSnap = await getDoc(agentRef);
@@ -44,10 +45,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               name: agentData.name,
               role: agentData.role,
               agentType: agentData.agentType,
-              dateHired: agentData.dateHired.toDate(),
+              dateHired: (agentData.dateHired as Timestamp).toDate(),
             });
           } else {
-            // Handle case where user exists in Auth but not in Firestore
+            // This case might happen if the Firestore doc creation fails after auth creation
+            // Or if a user is created in Auth console but not in Firestore
+            console.warn(`No profile found in Firestore for user ${firebaseUser.uid}`);
+            await signOut(auth); // Log out the user as they are in an inconsistent state
             setUser(null);
           }
         } catch (error) {

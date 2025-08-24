@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth"
-import { doc, setDoc, serverTimestamp, collection, getDocs, query, limit } from "firebase/firestore"
+import { doc, setDoc, getDocs, collection, query, limit } from "firebase/firestore"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
@@ -73,16 +73,18 @@ export default function SignupPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true)
     try {
-      // 1. Check if any agents already exist to determine the role
+      // 1. Create the user in Firebase Authentication first
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+
+      // Now that the user is authenticated, we can query Firestore
+      
+      // 2. Check if any agents already exist to determine the role
       const agentsRef = collection(db, "agents");
       const q = query(agentsRef, limit(1));
       const snapshot = await getDocs(q);
       
       const role: 'Superadmin' | 'Agent' = snapshot.empty ? 'Superadmin' : 'Agent';
-
-      // 2. Create the user in Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      const user = userCredential.user;
       
       // 3. Create the agent document in Firestore
       const agentData = {
@@ -91,7 +93,7 @@ export default function SignupPage() {
         email: values.email,
         agentType: values.agentType,
         role: role,
-        dateHired: serverTimestamp(),
+        dateHired: new Date(),
       };
 
       await setDoc(doc(db, "agents", user.uid), agentData);
@@ -100,12 +102,18 @@ export default function SignupPage() {
         title: "Account Created Successfully!",
         description: `Your account has been created with the role: ${role}. You will now be logged in.`,
       })
+      
+      // The onAuthStateChanged listener in AuthProvider will handle the redirect
+      // so a manual router.push("/") isn't strictly necessary but can speed it up.
       router.push("/")
+
     } catch (error: any) {
       console.error("Signup failed:", error)
       toast({
         title: "Signup Failed",
-        description: error.message || "An unexpected error occurred.",
+        description: error.code === 'auth/email-already-in-use' 
+            ? 'This email is already registered. Please log in.' 
+            : error.message || "An unexpected error occurred.",
         variant: "destructive",
       })
     } finally {
