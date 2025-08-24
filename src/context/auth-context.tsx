@@ -33,26 +33,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
       if (firebaseUser) {
-        const agentRef = doc(db, 'agents', firebaseUser.uid);
-        const agentSnap = await getDoc(agentRef);
-        if (agentSnap.exists()) {
-          const agentData = agentSnap.data();
-          setUser({
-            uid: firebaseUser.uid,
-            email: agentData.email,
-            name: agentData.name,
-            role: agentData.role,
-            agentType: agentData.agentType,
-            dateHired: agentData.dateHired.toDate(),
-          });
-        } else {
-          // Handle case where user exists in Auth but not in Firestore
+        try {
+          const agentRef = doc(db, 'agents', firebaseUser.uid);
+          const agentSnap = await getDoc(agentRef);
+          if (agentSnap.exists()) {
+            const agentData = agentSnap.data();
+            setUser({
+              uid: firebaseUser.uid,
+              email: agentData.email,
+              name: agentData.name,
+              role: agentData.role,
+              agentType: agentData.agentType,
+              dateHired: agentData.dateHired.toDate(),
+            });
+          } else {
+            // Handle case where user exists in Auth but not in Firestore
+            setUser(null);
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
           setUser(null);
+        } finally {
+          setLoading(false);
         }
       } else {
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
