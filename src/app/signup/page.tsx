@@ -76,9 +76,7 @@ export default function SignupPage() {
     try {
       // 1. Create the user in Firebase Authentication first
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      const user = userCredential.user;
-
-      // Now that the user is authenticated, we can query Firestore
+      const newUser = userCredential.user;
       
       // 2. Check if any agents already exist to determine the role
       const agentsRef = collection(db, "agents");
@@ -91,7 +89,7 @@ export default function SignupPage() {
 
       // 3. Create the agent document in Firestore
       const agentData = {
-        uid: user.uid,
+        uid: newUser.uid,
         name: values.name,
         email: values.email,
         agentType: values.agentType,
@@ -100,17 +98,23 @@ export default function SignupPage() {
         dateHired: new Date(),
       };
 
-      await setDoc(doc(db, "agents", user.uid), agentData);
+      await setDoc(doc(db, "agents", newUser.uid), agentData);
       
       toast({
         title: "Account Created Successfully!",
         description: isFirstUser 
             ? `Your account has been created with the role: ${role}. You will now be logged in.`
-            : `Your account has been created and is awaiting admin approval.`,
+            : `Your account has been created and is awaiting admin approval. You will be redirected to the login page.`,
       })
       
-      // The onAuthStateChanged listener in AuthProvider will handle the redirect or logout
-
+      if (!isFirstUser) {
+        // The onAuthStateChanged listener will handle logout, but we explicitly redirect.
+        await auth.signOut();
+        router.push('/login');
+      }
+      
+      // For the first user, the onAuthStateChanged listener in AuthProvider will handle the redirect to '/'
+      
     } catch (error: any) {
       console.error("Signup failed:", error)
       toast({

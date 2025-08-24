@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     variant: "destructive"
                 });
                 await signOut(auth);
-                setUser(null);
+                // No need to setUser(null) as onAuthStateChanged will refire with null
             } else if (agentData.status === 'Rejected') {
                  toast({
                     title: "Account Rejected",
@@ -59,7 +59,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     variant: "destructive"
                 });
                 await signOut(auth);
-                setUser(null);
             } else {
                 setUser({
                     uid: firebaseUser.uid,
@@ -72,13 +71,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 });
             }
           } else {
-            console.warn(`No profile found in Firestore for user ${firebaseUser.uid}`);
-            await signOut(auth);
-            setUser(null);
+            // This can happen briefly during signup before the Firestore doc is created.
+            // Let's not log out immediately, but wait for next state change.
+            console.warn(`No profile found in Firestore for user ${firebaseUser.uid}, will re-check.`);
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
-          setUser(null);
+          await signOut(auth);
         } finally {
           setLoading(false);
         }
@@ -89,14 +88,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [auth, toast]);
+  }, [auth, toast, router]);
 
   const logout = async () => {
     setLoading(true);
     await signOut(auth);
     setUser(null);
-    setLoading(false);
     router.push('/login');
+    setLoading(false);
   };
 
   return (
