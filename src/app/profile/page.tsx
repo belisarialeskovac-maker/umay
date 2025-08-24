@@ -76,7 +76,7 @@ function ProfilePage() {
     { id: 1, shopId: '', assets: '', clientDetails: '', conversationSummary: '', planForTomorrow: '', isCollapsed: false },
   ]);
   const [generatedReport, setGeneratedReport] = useState("");
-  const [isReportCardCollapsed, setReportCardCollapsed] = useState(false);
+  const [isReportCardCollapsed, setReportCardCollapsed] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -249,7 +249,7 @@ function ProfilePage() {
   };
 
 
-  if (dataLoading || !user) {
+  if (authLoading || dataLoading || !user) {
     return (
         <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -555,5 +555,3 @@ function ProfilePage() {
 }
 
 export default withAuth(ProfilePage, ['Agent', 'Admin', 'Superadmin']);
-
-    
