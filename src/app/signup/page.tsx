@@ -64,18 +64,18 @@ export default function SignupPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true)
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      const user = userCredential.user;
-      
+      // 1. Check if any agents already exist to determine the role
       const agentsRef = collection(db, "agents");
       const q = query(agentsRef, limit(1));
       const snapshot = await getDocs(q);
+      
+      const role: 'Superadmin' | 'Agent' = snapshot.empty ? 'Superadmin' : 'Agent';
 
-      let role: 'Superadmin' | 'Agent' = 'Agent';
-      if (snapshot.empty) {
-        role = 'Superadmin';
-      }
-
+      // 2. Create the user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+      
+      // 3. Create the agent document in Firestore
       const agentData = {
         uid: user.uid,
         name: values.name,
@@ -88,8 +88,8 @@ export default function SignupPage() {
       await setDoc(doc(db, "agents", user.uid), agentData);
       
       toast({
-        title: "Account Created",
-        description: `Your account has been created successfully as a ${role}.`,
+        title: "Account Created Successfully!",
+        description: `Your account has been created with the role: ${role}.`,
       })
       router.push("/")
     } catch (error: any) {
