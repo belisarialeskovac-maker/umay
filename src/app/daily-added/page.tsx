@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, isToday, isThisMonth } from 'date-fns';
@@ -13,14 +12,6 @@ import { collection, addDoc, onSnapshot, query, deleteDoc, doc, getDocs, Timesta
 
 import { Button } from '@/components/ui/button';
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
-import {
   Table,
   TableBody,
   TableCell,
@@ -28,13 +19,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,6 +34,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/context/auth-context';
+import withAuth from '@/components/with-auth';
+import { Label } from '@/components/ui/label';
 
 const agentSchema = z.object({
   id: z.string(),
@@ -60,12 +47,6 @@ const agentSchema = z.object({
 });
 
 type Agent = z.infer<typeof agentSchema>;
-
-const clientFormSchema = z.object({
-    assignedAgent: z.string().min(1, "An agent must be selected."),
-});
-
-type ClientForm = z.infer<typeof clientFormSchema>;
 
 type Client = {
     id: string;
@@ -84,7 +65,8 @@ type AgentStats = {
     }
 }
 
-export default function DailyAddedPage() {
+function DailyAddedPage() {
+  const { user } = useAuth();
   const [sessionClients, setSessionClients] = useState<Client[]>([]);
   const [allClients, setAllClients] = useState<Client[]>([]);
   const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([]);
@@ -95,13 +77,6 @@ export default function DailyAddedPage() {
   const [monthlyCount, setMonthlyCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [agentStats, setAgentStats] = useState<AgentStats>({});
-
-  const form = useForm<ClientForm>({
-    resolver: zodResolver(clientFormSchema),
-    defaultValues: {
-        assignedAgent: "",
-    },
-  });
 
   const calculateStats = useCallback((allDailyClients: Client[], currentAgents: Agent[]) => {
     const daily = allDailyClients.filter(c => isToday(new Date(c.date)));
@@ -189,9 +164,12 @@ export default function DailyAddedPage() {
 
 
   const handleAddClient = async () => {
-    const agentValue = form.getValues('assignedAgent');
-    if (!agentValue) {
-        form.setError("assignedAgent", { type: "manual", message: "Please select an agent."});
+    if (!user) {
+        toast({
+            title: 'Not Logged In',
+            description: 'You must be logged in to add a client.',
+            variant: 'destructive',
+        });
         return;
     }
 
@@ -243,7 +221,7 @@ export default function DailyAddedPage() {
           age,
           location,
           work,
-          assignedAgent: agentValue,
+          assignedAgent: user.name, // Automatically assign the logged-in agent
           date: new Date(),
         };
 
@@ -253,10 +231,9 @@ export default function DailyAddedPage() {
         
         toast({
           title: 'Client Added',
-          description: `${name} has been successfully added.`,
+          description: `${name} has been successfully added to your list.`,
         });
 
-        form.reset({ assignedAgent: "" });
         setPastedDetails('');
 
     } catch (error: any) {
@@ -385,46 +362,18 @@ export default function DailyAddedPage() {
                     <div>
                         <h2 className="text-xl font-semibold mb-4 flex items-center"><TextSearch className="mr-2 h-5 w-5" /> Parsing Area</h2>
                         <div className='space-y-4'>
-                            <Form {...form}>
-                                <form className="space-y-4">
-                                    <div>
-                                        <FormLabel htmlFor="pasted-details">1. Paste Client Details Here</FormLabel>
-                                        <Textarea 
-                                            id="pasted-details"
-                                            placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE&#10;&#10;Or:&#10;Camible&#10;47&#10;LTO Public Servant&#10;Benguet"
-                                            className='min-h-[150px] mt-2'
-                                            value={pastedDetails}
-                                            onChange={(e) => setPastedDetails(e.target.value)}
-                                        />
-                                    </div>
-                                    <FormField
-                                        control={form.control}
-                                        name="assignedAgent"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                            <FormLabel>2. Select Assigned Agent</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value || ''}>
-                                                <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select an agent" />
-                                                </SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent>
-                                                {registeredAgents.map((agent) => (
-                                                    <SelectItem key={agent.id} value={agent.name}>
-                                                    {agent.name}
-                                                    </SelectItem>
-                                                ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </form>
-                            </Form>
+                            <div className="space-y-2">
+                                <Label htmlFor="pasted-details">1. Paste Client Details Here</Label>
+                                <Textarea 
+                                    id="pasted-details"
+                                    placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE&#10;&#10;Or:&#10;Camible&#10;47&#10;LTO Public Servant&#10;Benguet"
+                                    className='min-h-[150px] mt-2'
+                                    value={pastedDetails}
+                                    onChange={(e) => setPastedDetails(e.target.value)}
+                                />
+                            </div>
                             <Button onClick={handleAddClient} className='w-full'>
-                                <UserPlus className="mr-2 h-4 w-4" /> 3. Parse and Add Client
+                                <UserPlus className="mr-2 h-4 w-4" /> 2. Parse and Add Client
                             </Button>
                         </div>
                     </div>
@@ -495,3 +444,7 @@ export default function DailyAddedPage() {
     </div>
   );
 }
+
+export default withAuth(DailyAddedPage, ['Agent', 'Admin', 'Superadmin']);
+
+    
