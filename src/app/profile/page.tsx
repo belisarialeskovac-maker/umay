@@ -162,6 +162,11 @@ function ProfilePage() {
         </div>
         <div className="flex items-center gap-2">
             <Button asChild variant="outline">
+                <Link href="/reporting">
+                    <FileText className="mr-2 h-4 w-4" /> Create Report
+                </Link>
+            </Button>
+            <Button asChild variant="outline">
                 <Link href="/videocall-template">
                     <Video className="mr-2 h-4 w-4" /> Videocall Template
                 </Link>
