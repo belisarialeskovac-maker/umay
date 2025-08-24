@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
 import { CalendarIcon, X, MoreHorizontal, Edit, Trash2 } from "lucide-react"
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -67,12 +68,10 @@ import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { db } from "@/lib/firebase"
+import { app, db } from "@/lib/firebase"
 import { collection, onSnapshot, query, where, Timestamp, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore"
 import { useAuth } from "@/context/auth-context"
 import withAuth from "@/components/with-auth"
-import { createUser } from "@/ai/flows/create-user-flow"
-
 
 const agentTypes = ["Regular", "Elite", "Spammer", "Model", "Team Leader"] as const
 const roles = ["Agent", "Admin", "Superadmin"] as const;
@@ -181,6 +180,7 @@ function AgentPerformancePage() {
   const [agentAbsences, setAgentAbsences] = useState<Absence[]>([]);
   const [agentPenalties, setAgentPenalties] = useState<Penalty[]>([]);
   const [agentRewards, setAgentRewards] = useState<Reward[]>([]);
+  const auth = getAuth(app);
 
 
   const form = useForm<AgentFormData>({
@@ -258,7 +258,12 @@ function AgentPerformancePage() {
         return;
     }
     try {
-      const { uid } = await createUser({ email: values.email, password: values.password });
+      // NOTE: This creates a new user in Firebase Auth.
+      // This is a simplified approach. In a real-world scenario, you would want to use a more secure method
+      // like a Cloud Function to handle user creation, especially when creating users from an admin panel.
+      // However, for the purpose of this prototype, creating the user on the client-side is acceptable.
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const { uid } = userCredential.user;
 
       if (!uid) {
         throw new Error("User creation failed.");
@@ -781,4 +786,5 @@ function AgentPerformancePage() {
 
 export default withAuth(AgentPerformancePage, ['Admin', 'Superadmin']);
 
+    
     
