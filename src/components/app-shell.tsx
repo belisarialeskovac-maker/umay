@@ -24,13 +24,11 @@ import {
   CalendarPlus,
   ClipboardList,
   LayoutDashboard,
-  Megaphone,
   FileText,
   Settings,
   Users,
   UserCheck,
   Video,
-  ChevronRight,
   LogOut,
   User as UserIcon,
 } from 'lucide-react';
@@ -47,11 +45,10 @@ const navItems = [
   { href: '/deposit', icon: ArrowDownToLine, label: 'Deposit', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/withdrawal', icon: ArrowUpFromLine, label: 'Withdrawal', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/team-performance', icon: AreaChart, label: 'Team Performance', roles: ['Admin', 'Superadmin'] },
-  { href: '/agent-performance', icon: UserCheck, label: 'Agent Performance', roles: ['Admin', 'Superadmin'] },
+  { href: '/agent-performance', icon: UserCheck, label: 'Agent Management', roles: ['Admin', 'Superadmin'] },
   { href: '/reporting', icon: FileText, label: 'Reporting', roles: ['Admin', 'Superadmin'] },
   { href: '/daily-added', icon: CalendarPlus, label: 'Daily Added', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/inventory', icon: Boxes, label: 'Inventory', roles: ['Admin', 'Superadmin'] },
-  { href: '#', icon: Megaphone, label: 'Announcement', roles: ['Agent', 'Admin', 'Superadmin'] },
 ];
 
 const settingsNav = { href: '#', icon: Settings, label: 'Settings' };

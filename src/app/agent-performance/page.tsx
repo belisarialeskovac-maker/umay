@@ -263,7 +263,7 @@ function AgentPerformancePage() {
     <div className="w-full h-full">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Agent Performance</h1>
+          <h1 className="text-3xl font-bold text-foreground">Agent Management</h1>
           <p className="text-muted-foreground mt-1">
             Monitor and manage your agents. Click on an agent to view their details.
           </p>
