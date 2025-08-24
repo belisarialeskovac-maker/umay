@@ -51,6 +51,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 import { useData } from "@/context/data-context"
+import withAuth from "@/components/with-auth"
 import type { Client } from "@/context/data-context"
 
 const clientStatus = ["In Process", "Active", "Eliminated"] as const;
@@ -66,7 +67,7 @@ const formSchema = z.object({
   clientDetails: z.string(),
 })
 
-export default function ClientDetailsPage() {
+function ClientDetailsPage() {
   const [open, setOpen] = useState(false)
   const { clients, agents, loading: dataLoading } = useData();
   const { toast } = useToast()
@@ -301,3 +302,7 @@ export default function ClientDetailsPage() {
     </div>
   )
 }
+
+export default withAuth(ClientDetailsPage);
+
+    

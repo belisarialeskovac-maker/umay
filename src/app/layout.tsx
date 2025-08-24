@@ -7,14 +7,6 @@ import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/context/auth-context';
 import { DataProvider } from '@/context/data-context';
 
-function AppLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return <AppShell>{children}</AppShell>
-}
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -33,7 +25,7 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <AuthProvider>
           <DataProvider>
-            <AppLayout>{children}</AppLayout>
+            <AppShell>{children}</AppShell>
             <Toaster />
           </DataProvider>
         </AuthProvider>
@@ -41,3 +33,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+    

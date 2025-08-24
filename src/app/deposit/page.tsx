@@ -43,6 +43,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useData } from "@/context/data-context"
+import withAuth from "@/components/with-auth"
 import type { Deposit } from "@/context/data-context"
 
 const paymentModes = ["Ewallet/Online Banking", "Crypto"] as const
@@ -59,7 +60,7 @@ const formSchema = z.object({
 })
 
 
-export default function DepositPage() {
+function DepositPage() {
   const [open, setOpen] = useState(false)
   const { deposits, clients, loading: dataLoading } = useData();
   const { toast } = useToast()
@@ -319,3 +320,7 @@ export default function DepositPage() {
     </div>
   )
 }
+
+export default withAuth(DepositPage);
+
+    

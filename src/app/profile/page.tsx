@@ -249,7 +249,7 @@ function ProfilePage() {
   };
 
 
-  if (authLoading || dataLoading || !user) {
+  if (dataLoading || !user) {
     return (
         <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -555,3 +555,5 @@ function ProfilePage() {
 }
 
 export default withAuth(ProfilePage, ['Agent', 'Admin', 'Superadmin']);
+
+    

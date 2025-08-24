@@ -112,14 +112,7 @@ function TeamPerformancePage() {
 
 
   useEffect(() => {
-    const calculatePerformanceMetrics = (
-        agents: Agent[], 
-        performanceDocs: {[key: string]: TeamPerformanceData},
-        dailyAddedClients: DailyAddedClient[],
-        clients: Client[],
-        deposits: Transaction[],
-        withdrawals: Transaction[]
-    ) => {
+    const calculatePerformanceMetrics = () => {
         const performanceData = agents.map(agent => {
             const systemMetrics = {
                 addedToday: dailyAddedClients.filter(c => c.assignedAgent === agent.name && isToday(c.date)).length,
@@ -129,7 +122,7 @@ function TeamPerformancePage() {
                 totalWithdrawals: withdrawals.filter(w => w.agent === agent.name && isThisMonth(w.date)).reduce((sum, w) => sum + w.amount, 0),
             };
 
-            const storedAgentData = performanceDocs[agent.name];
+            const storedAgentData = teamPerformanceDocs[agent.name];
             const isEdited = storedAgentData && storedAgentData.lastEditedBy !== 'System';
             
             return {
@@ -147,7 +140,7 @@ function TeamPerformancePage() {
     };
 
     if (!dataLoading) {
-      calculatePerformanceMetrics(agents, teamPerformanceDocs, dailyAddedClients, clients, deposits, withdrawals);
+      calculatePerformanceMetrics();
     }
   }, [agents, teamPerformanceDocs, dailyAddedClients, clients, deposits, withdrawals, dataLoading]);
 
@@ -206,7 +199,7 @@ function TeamPerformancePage() {
       setEditedData(prev => ({...prev, [field]: value}));
   }
   
-  if (authLoading || dataLoading) {
+  if (dataLoading) {
     return (
         <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -608,3 +601,5 @@ function TeamPerformancePage() {
 
 
 export default withAuth(TeamPerformancePage, ['Admin', 'Superadmin']);
+
+    

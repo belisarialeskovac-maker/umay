@@ -53,6 +53,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 import { useData } from "@/context/data-context"
+import withAuth from "@/components/with-auth"
 import type { Order } from "@/context/data-context"
 
 const orderStatus = ["Pending", "Approved", "Rejected"] as const;
@@ -66,7 +67,7 @@ const formSchema = z.object({
   remarks: z.string(),
 })
 
-export default function OrderRequestPage() {
+function OrderRequestPage() {
   const [open, setOpen] = useState(false)
   const { orders, agents, clients, loading: dataLoading } = useData();
   const { toast } = useToast()
@@ -134,7 +135,22 @@ export default function OrderRequestPage() {
   const renderOrderTable = (status: OrderStatus) => {
     const filteredOrders = orders.filter(order => order.status === status);
 
-    return filteredOrders.length > 0 ? (
+    if (filteredOrders.length === 0) {
+      return (
+        <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] p-6">
+            <div className="text-center">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                No {status} Orders
+            </h2>
+            <p className="text-muted-foreground mt-2">
+                There are currently no orders with this status.
+            </p>
+            </div>
+        </div>
+      )
+    }
+
+    return (
       <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>
@@ -173,17 +189,6 @@ export default function OrderRequestPage() {
             ))}
           </TableBody>
         </Table>
-      </div>
-    ) : (
-      <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] p-6">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">
-            No {status} Orders
-          </h2>
-          <p className="text-muted-foreground mt-2">
-            There are currently no orders with this status.
-          </p>
-        </div>
       </div>
     );
   }
@@ -342,3 +347,7 @@ export default function OrderRequestPage() {
     </div>
   )
 }
+
+export default withAuth(OrderRequestPage);
+
+    

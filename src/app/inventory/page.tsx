@@ -13,13 +13,14 @@ import InventoryTable from "./components/inventory-table"
 import AddDeviceForm from "./components/add-device-form"
 import AgentStatistics from "./components/agent-statistics"
 import { useData } from "@/context/data-context"
+import withAuth from "@/components/with-auth"
 import type { DeviceInventory } from "@/context/data-context"
 
 export type AgentStats = {
   [key: string]: number
 }
 
-export default function InventoryPage() {
+function InventoryPage() {
   const { inventory: devices, agents, loading: dataLoading } = useData();
   const [filteredDevices, setFilteredDevices] = useState<DeviceInventory[]>([])
   const [agentStats, setAgentStats] = useState<AgentStats>({})
@@ -225,3 +226,7 @@ export default function InventoryPage() {
     </div>
   )
 }
+
+export default withAuth(InventoryPage, ['Admin', 'Superadmin']);
+
+    

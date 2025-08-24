@@ -184,6 +184,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         { name: 'rewards', setter: setRewards },
     ];
     let loadedCount = 0;
+    const totalCollections = collectionsToFetch.length + 1; // +1 for teamPerformance
+
+    const handleInitialLoad = () => {
+        loadedCount++;
+        if (loadedCount === totalCollections) {
+            setLoading(false);
+        }
+    }
 
     const createCollectionListener = (collectionName: string, setData: (data: any[]) => void) => {
         const q = query(collection(db, collectionName));
@@ -200,23 +208,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
                 dataList.push(item);
             });
             setData(dataList);
-
-            // This logic ensures we only set loading to false after the initial fetch of all collections
-            if(loadedCount < collectionsToFetch.length + 1) { // +1 for teamPerformance
-                loadedCount++;
-                if (loadedCount === collectionsToFetch.length + 1) {
-                    setLoading(false);
-                }
-            }
-
+            handleInitialLoad();
         }, (error) => {
             console.error(`Error fetching ${collectionName}:`, error);
-            if(loadedCount < collectionsToFetch.length + 1) {
-                loadedCount++;
-                if (loadedCount === collectionsToFetch.length + 1) {
-                    setLoading(false);
-                }
-            }
+            handleInitialLoad();
         });
         return unsubscribe;
     }
@@ -231,21 +226,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             perfDocs[doc.id] = doc.data() as TeamPerformanceData;
         });
         setTeamPerformance(perfDocs);
-
-        if(loadedCount < collectionsToFetch.length + 1) {
-            loadedCount++;
-            if (loadedCount === collectionsToFetch.length + 1) {
-                setLoading(false);
-            }
-        }
+        handleInitialLoad();
     }, (error) => {
         console.error(`Error fetching teamPerformance:`, error);
-        if(loadedCount < collectionsToFetch.length + 1) {
-            loadedCount++;
-            if (loadedCount === collectionsToFetch.length + 1) {
-                setLoading(false);
-            }
-        }
+        handleInitialLoad();
     });
     unsubscribers.push(perfUnsub);
     
@@ -284,3 +268,5 @@ export const useData = (): DataContextType => {
   }
   return context;
 };
+
+    

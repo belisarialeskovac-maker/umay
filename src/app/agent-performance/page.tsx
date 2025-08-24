@@ -251,7 +251,7 @@ function AgentPerformancePage() {
   
   const canRegisterAgent = user?.role === 'Admin' || user?.role === 'Superadmin';
   
-  if (authLoading || dataLoading) {
+  if (dataLoading) {
     return (
         <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -572,7 +572,7 @@ function AgentPerformancePage() {
                 </Tabs>
             </CardContent>
         </Card>
-      ) : agents.length > 0 ? (
+      ) : (
         <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>
@@ -610,17 +610,6 @@ function AgentPerformancePage() {
               ))}
             </TableBody>
           </Table>
-        </div>
-      ) : (
-        <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] p-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">
-              No Agents Registered
-            </h2>
-            <p className="text-muted-foreground mt-2">
-              Register an agent to see their performance data here.
-            </p>
-          </div>
         </div>
       )}
 
@@ -693,3 +682,5 @@ function AgentPerformancePage() {
 
 
 export default withAuth(AgentPerformancePage, ['Admin', 'Superadmin']);
+
+    

@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import type { UserProfile } from '@/context/auth-context';
+import { Loader2 } from 'lucide-react';
 
 type Role = UserProfile['role'];
 
@@ -32,8 +33,22 @@ const withAuth = <P extends object>(
 
     }, [user, loading, router, allowedRoles]);
 
-    // Render the component if authenticated and authorized
-    // A loading state can be handled within the wrapped component itself
+    if (loading) {
+      return (
+        <div className="flex h-full w-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      )
+    }
+
+    if (!user) {
+        return null; // Or a fallback component for unauthenticated users
+    }
+
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+        return null; // Or a fallback component for unauthorized users
+    }
+
     return <WrappedComponent {...props} />;
   };
 
@@ -43,3 +58,5 @@ const withAuth = <P extends object>(
 };
 
 export default withAuth;
+
+    

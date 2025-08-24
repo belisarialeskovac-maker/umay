@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { app } from "@/lib/firebase"
 import { useAuth } from "@/context/auth-context"
+import { Loader2 } from "lucide-react"
 
 const formSchema = z.object({
   email: z.string().email({
@@ -40,7 +41,7 @@ const formSchema = z.object({
 })
 
 export default function LoginPage() {
-  const [loading, setLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
   const auth = getAuth(app)
@@ -62,14 +63,14 @@ export default function LoginPage() {
   })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setLoading(true)
+    setIsSubmitting(true)
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password)
       toast({
         title: "Login Successful",
         description: "Welcome back!",
       })
-      router.push("/")
+      // The redirect is handled by the useEffect and AuthProvider
     } catch (error: any) {
       console.error("Login failed:", error)
       toast({
@@ -78,14 +79,14 @@ export default function LoginPage() {
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setIsSubmitting(false)
     }
   }
   
   if (authLoading || user) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
-        <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -129,8 +130,13 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Logging in..." : "Log in"}
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? (
+                    <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Logging in...
+                    </>
+                ) : "Log in"}
               </Button>
             </form>
           </Form>
@@ -145,3 +151,5 @@ export default function LoginPage() {
     </div>
   )
 }
+
+    

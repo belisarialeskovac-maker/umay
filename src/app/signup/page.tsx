@@ -37,6 +37,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { app, db } from "@/lib/firebase"
 import { useAuth } from "@/context/auth-context"
+import { Loader2 } from "lucide-react"
 
 const agentTypes = ["Regular", "Elite", "Spammer", "Model", "Team Leader"] as const
 
@@ -48,7 +49,7 @@ const formSchema = z.object({
 })
 
 export default function SignupPage() {
-  const [loading, setLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
   const auth = getAuth(app)
@@ -71,7 +72,7 @@ export default function SignupPage() {
   })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setLoading(true)
+    setIsSubmitting(true)
     try {
       // 1. Create the user in Firebase Authentication first
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
@@ -104,8 +105,6 @@ export default function SignupPage() {
       })
       
       // The onAuthStateChanged listener in AuthProvider will handle the redirect
-      // so a manual router.push("/") isn't strictly necessary but can speed it up.
-      router.push("/")
 
     } catch (error: any) {
       console.error("Signup failed:", error)
@@ -117,14 +116,14 @@ export default function SignupPage() {
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setIsSubmitting(false)
     }
   }
   
   if (authLoading || user) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
-        <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -204,8 +203,13 @@ export default function SignupPage() {
                     </FormItem>
                   )}
                 />
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Creating account..." : "Create account"}
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                 {isSubmitting ? (
+                    <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating account...
+                    </>
+                ) : "Create account"}
               </Button>
             </form>
           </Form>
@@ -220,3 +224,5 @@ export default function SignupPage() {
     </div>
   )
 }
+
+    
