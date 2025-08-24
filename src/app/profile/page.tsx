@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format, isToday, isThisMonth, startOfToday } from "date-fns"
-import { Loader2, Plus, Trash2, ChevronUp, ChevronDown, FileText, RefreshCw, Languages, Copy, Download, Upload, Calendar, BarChart, Banknote, ClipboardList, Video } from "lucide-react"
+import { Loader2, Plus, Trash2, ChevronUp, ChevronDown, FileText, RefreshCw, Languages, Copy, Download, Upload, Calendar, BarChart, Banknote, ClipboardList, Video, Boxes } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { doc, setDoc, getDoc, onSnapshot, Timestamp, collection, addDoc } from "firebase/firestore"
 import Link from "next/link"
@@ -161,6 +161,11 @@ function ProfilePage() {
             </p>
         </div>
         <div className="flex items-center gap-2">
+            <Button asChild variant="outline">
+                <Link href="/inventory">
+                    <Boxes className="mr-2 h-4 w-4" /> Inventory
+                </Link>
+            </Button>
             <Button asChild variant="outline">
                 <Link href="/reporting">
                     <FileText className="mr-2 h-4 w-4" /> Create Report
@@ -401,3 +406,5 @@ function ProfilePage() {
 }
 
 export default withAuth(ProfilePage, ['Agent', 'Admin', 'Superadmin']);
+
+    
