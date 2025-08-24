@@ -39,7 +39,6 @@ function DailyAddedPage() {
   const { user, loading: authLoading } = useAuth();
   const { agents, dailyAddedClients, loading: dataLoading } = useData();
 
-  const [sessionClients, setSessionClients] = useState<Client[]>([]);
   const [pastedDetails, setPastedDetails] = useState('');
   const [isAddingClient, setIsAddingClient] = useState(false);
   const { toast } = useToast();
@@ -171,13 +170,11 @@ function DailyAddedPage() {
           date: new Date(),
         };
 
-        const docRef = await addDoc(collection(db, 'dailyAddedClients'), newClientData);
-        
-        setSessionClients((prevClients) => [...prevClients, { ...newClientData, id: docRef.id }]);
+        await addDoc(collection(db, 'dailyAddedClients'), newClientData);
         
         toast({
           title: 'Client Added',
-          description: `${name} has been successfully added to your list.`,
+          description: `${name} has been successfully added to your list. The table will update shortly.`,
         });
 
         setPastedDetails('');
@@ -301,8 +298,8 @@ function DailyAddedPage() {
                     </div>
                     
                     <div>
-                        <h2 className="text-xl font-semibold mb-4">Added This Session</h2>
-                        {sessionClients.length > 0 ? (
+                        <h2 className="text-xl font-semibold mb-4">All Added Clients</h2>
+                        {dailyAddedClients.length > 0 ? (
                             <div className="rounded-lg border bg-card">
                             <Table>
                                 <TableHeader>
@@ -316,7 +313,7 @@ function DailyAddedPage() {
                                 </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                {sessionClients.map((client) => (
+                                {dailyAddedClients.map((client) => (
                                     <TableRow key={client.id}>
                                     <TableCell>{client.name}</TableCell>
                                     <TableCell>{client.age}</TableCell>
@@ -333,10 +330,10 @@ function DailyAddedPage() {
                             <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm min-h-[30vh]">
                             <div className="text-center">
                                 <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                                No Clients Added This Session
+                                No Clients Added Yet
                                 </h2>
                                 <p className="text-muted-foreground mt-2">
-                                Clients added in this session will appear here.
+                                Clients added from the parsing area will appear here.
                                 </p>
                             </div>
                             </div>
@@ -368,3 +365,5 @@ function DailyAddedPage() {
 }
 
 export default withAuth(DailyAddedPage, ['Agent', 'Admin', 'Superadmin']);
+
+    
