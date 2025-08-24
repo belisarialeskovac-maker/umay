@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth"
-import { doc, setDoc, serverTimestamp } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp, collection, getDocs, query, limit } from "firebase/firestore"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
@@ -66,13 +66,22 @@ export default function SignupPage() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
+      
+      const agentsRef = collection(db, "agents");
+      const q = query(agentsRef, limit(1));
+      const snapshot = await getDocs(q);
+
+      let role: 'Superadmin' | 'Agent' = 'Agent';
+      if (snapshot.empty) {
+        role = 'Superadmin';
+      }
 
       const agentData = {
         uid: user.uid,
         name: values.name,
         email: values.email,
         agentType: values.agentType,
-        role: "Agent", // Default role
+        role: role,
         dateHired: serverTimestamp(),
       };
 
@@ -80,7 +89,7 @@ export default function SignupPage() {
       
       toast({
         title: "Account Created",
-        description: "Your account has been created successfully.",
+        description: `Your account has been created successfully as a ${role}.`,
       })
       router.push("/")
     } catch (error: any) {
