@@ -7,6 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
 import { CalendarIcon } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, onSnapshot, query, Timestamp } from "firebase/firestore";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -49,6 +51,7 @@ import { useToast } from "@/hooks/use-toast"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 const clientSchema = z.object({
+    id: z.string(),
     shopId: z.string(),
     clientName: z.string(),
     agent: z.string(),
@@ -72,7 +75,7 @@ const formSchema = z.object({
   paymentMode: z.enum(paymentModes),
 })
 
-type Deposit = z.infer<typeof formSchema>
+type Deposit = z.infer<typeof formSchema> & { id: string }
 
 export default function DepositPage() {
   const [open, setOpen] = useState(false)
@@ -80,7 +83,7 @@ export default function DepositPage() {
   const [clients, setClients] = useState<Client[]>([])
   const { toast } = useToast()
 
-  const form = useForm<Deposit>({
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       shopId: "",
@@ -95,22 +98,37 @@ export default function DepositPage() {
   const watchedShopId = form.watch("shopId");
 
   useEffect(() => {
-    const storedClients = localStorage.getItem("clients");
-    if (storedClients) {
-      const parsedClients = JSON.parse(storedClients).map((client: any) => ({
-        ...client,
-        kycCompletedDate: new Date(client.kycCompletedDate),
-      }));
-      setClients(parsedClients);
-    }
+    const clientsQuery = query(collection(db, "clients"));
+    const unsubscribeClients = onSnapshot(clientsQuery, (querySnapshot) => {
+        const clientsData: Client[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            clientsData.push({ 
+              ...data, 
+              id: doc.id,
+              kycCompletedDate: (data.kycCompletedDate as Timestamp).toDate()
+            } as Client);
+        });
+        setClients(clientsData);
+    });
 
-    const storedDeposits = localStorage.getItem("deposits");
-    if (storedDeposits) {
-        const parsedDeposits = JSON.parse(storedDeposits).map((deposit: any) => ({
-            ...deposit,
-            date: new Date(deposit.date),
-        }));
-        setDeposits(parsedDeposits);
+    const depositsQuery = query(collection(db, "deposits"));
+    const unsubscribeDeposits = onSnapshot(depositsQuery, (querySnapshot) => {
+        const depositsData: Deposit[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            depositsData.push({ 
+              ...data, 
+              id: doc.id,
+              date: (data.date as Timestamp).toDate()
+            } as Deposit);
+        });
+        setDeposits(depositsData);
+    });
+
+    return () => {
+        unsubscribeClients();
+        unsubscribeDeposits();
     }
   }, []);
 
@@ -127,23 +145,30 @@ export default function DepositPage() {
     }
   }, [watchedShopId, clients, form]);
 
-  function onSubmit(values: Deposit) {
-    const updatedDeposits = [...deposits, values]
-    setDeposits(updatedDeposits)
-    localStorage.setItem("deposits", JSON.stringify(updatedDeposits));
-    toast({
-      title: "Deposit Added",
-      description: `Successfully added deposit for ${values.clientName}.`,
-    })
-    setOpen(false)
-    form.reset({
-        shopId: "",
-        clientName: "",
-        agent: "",
-        paymentMode: "Ewallet/Online Banking",
-        amount: 0,
-        date: new Date(),
-    })
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await addDoc(collection(db, "deposits"), values);
+      toast({
+        title: "Deposit Added",
+        description: `Successfully added deposit for ${values.clientName}.`,
+      })
+      setOpen(false)
+      form.reset({
+          shopId: "",
+          clientName: "",
+          agent: "",
+          paymentMode: "Ewallet/Online Banking",
+          amount: 0,
+          date: new Date(),
+      })
+    } catch(error) {
+      console.error("Error adding deposit: ", error);
+      toast({
+        title: "Error",
+        description: "Failed to add deposit.",
+        variant: "destructive"
+      });
+    }
   }
 
   const clientFound = !!watchedShopId && clients.some(c => c.shopId === watchedShopId);
@@ -312,8 +337,8 @@ export default function DepositPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {deposits.map((deposit, index) => (
-                <TableRow key={index}>
+              {deposits.map((deposit) => (
+                <TableRow key={deposit.id}>
                   <TableCell>{deposit.shopId}</TableCell>
                   <TableCell>{deposit.clientName}</TableCell>
                   <TableCell>{deposit.agent}</TableCell>

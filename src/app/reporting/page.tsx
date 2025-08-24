@@ -7,6 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { isToday, isThisMonth } from "date-fns"
 import { User, Calendar, BarChart, Banknote, Plus, Trash2, ChevronUp, ChevronDown, FileText, RefreshCw, Languages, Copy, Download, Upload } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { collection, onSnapshot, query, where, Timestamp } from "firebase/firestore";
 
 import {
   Form,
@@ -34,6 +36,7 @@ import { useToast } from "@/hooks/use-toast"
 // --- Data Schemas ---
 
 const agentSchema = z.object({
+  id: z.string(),
   name: z.string(),
   email: z.string(),
   dateHired: z.date(),
@@ -42,12 +45,14 @@ const agentSchema = z.object({
 type Agent = z.infer<typeof agentSchema>;
 
 const dailyAddedClientSchema = z.object({
+  id: z.string(),
   assignedAgent: z.string(),
   date: z.date(),
 });
 type DailyAddedClient = z.infer<typeof dailyAddedClientSchema>;
 
 const clientSchema = z.object({
+  id: z.string(),
   agent: z.string(),
   kycCompletedDate: z.date(),
   shopId: z.string(),
@@ -56,6 +61,7 @@ const clientSchema = z.object({
 type Client = z.infer<typeof clientSchema>;
 
 const depositSchema = z.object({
+  id: z.string(),
   agent: z.string(),
   date: z.date(),
   amount: z.number(),
@@ -103,25 +109,25 @@ export default function ReportingPage() {
 
   // --- Data Loading Effect ---
   useEffect(() => {
-    const storedAgents = localStorage.getItem("agents");
-    if (storedAgents) {
-      setRegisteredAgents(JSON.parse(storedAgents).map((a: any) => ({ ...a, dateHired: new Date(a.dateHired) })));
-    }
-    
-    const storedDailyAdded = localStorage.getItem("dailyAddedClients");
-    if (storedDailyAdded) {
-        setDailyAddedClients(JSON.parse(storedDailyAdded).map((c: any) => ({ ...c, date: new Date(c.date) })));
-    }
+    const unsubAgents = onSnapshot(collection(db, "agents"), (snapshot) => {
+        setRegisteredAgents(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, dateHired: (doc.data().dateHired as Timestamp).toDate() } as Agent)));
+    });
+    const unsubDaily = onSnapshot(collection(db, "dailyAddedClients"), (snapshot) => {
+        setDailyAddedClients(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as DailyAddedClient)));
+    });
+    const unsubClients = onSnapshot(collection(db, "clients"), (snapshot) => {
+        setClients(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, kycCompletedDate: (doc.data().kycCompletedDate as Timestamp).toDate() } as Client)));
+    });
+    const unsubDeposits = onSnapshot(collection(db, "deposits"), (snapshot) => {
+        setDeposits(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as Deposit)));
+    });
 
-    const storedClients = localStorage.getItem("clients");
-    if (storedClients) {
-        setClients(JSON.parse(storedClients).map((c: any) => ({ ...c, kycCompletedDate: new Date(c.kycCompletedDate) })));
-    }
-
-    const storedDeposits = localStorage.getItem("deposits");
-    if (storedDeposits) {
-        setDeposits(JSON.parse(storedDeposits).map((d: any) => ({ ...d, date: new Date(d.date) })));
-    }
+    return () => {
+        unsubAgents();
+        unsubDaily();
+        unsubClients();
+        unsubDeposits();
+    };
   }, []);
 
   const agentClients = useMemo(() => {
@@ -253,6 +259,7 @@ export default function ReportingPage() {
           agent: selectedAgent,
           stats: agentStats,
           clients: clientInfoList,
+          exportedAt: new Date().toISOString(),
       };
       const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
       const link = document.createElement("a");
@@ -321,7 +328,7 @@ export default function ReportingPage() {
                                     </FormControl>
                                     <SelectContent>
                                     {registeredAgents.map((agent) => (
-                                        <SelectItem key={agent.name} value={agent.name}>
+                                        <SelectItem key={agent.id} value={agent.name}>
                                         {agent.name}
                                         </SelectItem>
                                     ))}
@@ -408,7 +415,7 @@ export default function ReportingPage() {
                                         </SelectTrigger>
                                         <SelectContent>
                                             {agentClients.map(c => (
-                                                <SelectItem key={c.shopId} value={c.shopId}>
+                                                <SelectItem key={c.id} value={c.shopId}>
                                                     {c.shopId} - ({c.clientName})
                                                 </SelectItem>
                                             ))}
@@ -477,5 +484,3 @@ export default function ReportingPage() {
     </div>
   )
 }
-
-    

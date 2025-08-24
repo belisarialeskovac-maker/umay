@@ -49,6 +49,8 @@ import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, onSnapshot, query, where, Timestamp } from "firebase/firestore"
 
 const agentTypes = ["Regular", "Elite", "Spammer", "Model", "Team Leader"] as const
 
@@ -65,10 +67,10 @@ const formSchema = z.object({
   agentType: z.enum(agentTypes),
 })
 
-type Agent = z.infer<typeof formSchema>
+type Agent = z.infer<typeof formSchema> & { id: string }
 
-// Data types from other pages
 type Client = {
+    id: string;
     shopId: string;
     clientName: string;
     agent: string;
@@ -77,6 +79,7 @@ type Client = {
     clientDetails: string;
 }
 type Transaction = {
+    id: string;
     shopId: string;
     clientName: string;
     agent: string;
@@ -97,7 +100,7 @@ type Inventory = {
     updatedAt: string;
 }
 type Order = {
-    id: number;
+    id: string;
     agent: string;
     shopId: string;
     location: string;
@@ -106,17 +109,20 @@ type Order = {
     status: "Pending" | "Approved" | "Rejected";
 }
 type Absence = {
+  id: string;
   date: Date;
   agent: string;
   remarks: string;
 }
 type Penalty = {
+  id: string;
   date: Date;
   agent: string;
   remarks: string;
   amount: number;
 }
 type Reward = {
+  id: string;
   date: Date;
   agent: string;
   remarks: string;
@@ -131,7 +137,6 @@ export default function AgentPerformancePage() {
   
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   
-  // States for agent-related data
   const [agentClients, setAgentClients] = useState<Client[]>([]);
   const [agentDeposits, setAgentDeposits] = useState<Transaction[]>([]);
   const [agentWithdrawals, setAgentWithdrawals] = useState<Transaction[]>([]);
@@ -142,7 +147,7 @@ export default function AgentPerformancePage() {
   const [agentRewards, setAgentRewards] = useState<Reward[]>([]);
 
 
-  const form = useForm<Agent>({
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
@@ -151,50 +156,76 @@ export default function AgentPerformancePage() {
   })
 
   useEffect(() => {
-    const storedAgents = localStorage.getItem("agents");
-    if (storedAgents) {
-      const parsedAgents = JSON.parse(storedAgents).map((agent: any) => ({
-        ...agent,
-        dateHired: new Date(agent.dateHired),
-      }));
-      setAgents(parsedAgents);
-    }
+    const q = query(collection(db, "agents"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const agentsData: Agent[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        agentsData.push({ 
+          ...data, 
+          id: doc.id,
+          dateHired: (data.dateHired as Timestamp).toDate()
+        } as Agent);
+      });
+      setAgents(agentsData);
+    });
+    return () => unsubscribe();
   }, []);
   
   useEffect(() => {
     if (selectedAgent) {
-        // Load all data from localStorage and filter for the selected agent
-        const allClients: Client[] = JSON.parse(localStorage.getItem('clients') || '[]').map((c:any) => ({...c, kycCompletedDate: new Date(c.kycCompletedDate)}));
-        const allDeposits: Transaction[] = JSON.parse(localStorage.getItem('deposits') || '[]').map((d:any) => ({...d, date: new Date(d.date)}));
-        const allWithdrawals: Transaction[] = JSON.parse(localStorage.getItem('withdrawals') || '[]').map((w:any) => ({...w, date: new Date(w.date)}));
-        const allInventory: Inventory[] = JSON.parse(localStorage.getItem('inventory') || '[]');
-        const allOrders: Order[] = JSON.parse(localStorage.getItem('orders') || '[]');
-        const allAbsences: Absence[] = JSON.parse(localStorage.getItem('absences') || '[]').map((a:any) => ({...a, date: new Date(a.date)}));
-        const allPenalties: Penalty[] = JSON.parse(localStorage.getItem('penalties') || '[]').map((p:any) => ({...p, date: new Date(p.date)}));
-        const allRewards: Reward[] = JSON.parse(localStorage.getItem('rewards') || '[]').map((r:any) => ({...r, date: new Date(r.date)}));
+        const collections = ["clients", "deposits", "withdrawals", "inventory", "orders", "absences", "penalties", "rewards"];
+        const setters:any = {
+            clients: setAgentClients,
+            deposits: setAgentDeposits,
+            withdrawals: setAgentWithdrawals,
+            inventory: setAgentInventory,
+            orders: setAgentOrders,
+            absences: setAgentAbsences,
+            penalties: setAgentPenalties,
+            rewards: setAgentRewards
+        };
 
-        setAgentClients(allClients.filter(c => c.agent === selectedAgent.name));
-        setAgentDeposits(allDeposits.filter(d => d.agent === selectedAgent.name));
-        setAgentWithdrawals(allWithdrawals.filter(w => w.agent === selectedAgent.name));
-        setAgentInventory(allInventory.filter(i => i.agent === selectedAgent.name));
-        setAgentOrders(allOrders.filter(o => o.agent === selectedAgent.name));
-        setAgentAbsences(allAbsences.filter(a => a.agent === selectedAgent.name));
-        setAgentPenalties(allPenalties.filter(p => p.agent === selectedAgent.name));
-        setAgentRewards(allRewards.filter(r => r.agent === selectedAgent.name));
+        collections.forEach(col => {
+            const q = query(collection(db, col), where("agent", "==", selectedAgent.name));
+            const unsubscribe = onSnapshot(q, (querySnapshot) => {
+                const data: any[] = [];
+                querySnapshot.forEach((doc) => {
+                    const docData = doc.data();
+                    const item: any = { id: doc.id, ...docData };
+                    // Convert Timestamps to Dates
+                    for(const key in item) {
+                        if(item[key] instanceof Timestamp) {
+                            item[key] = item[key].toDate();
+                        }
+                    }
+                    data.push(item);
+                });
+                setters[col](data);
+            });
+            return () => unsubscribe();
+        });
     }
   }, [selectedAgent]);
 
 
-  function onSubmit(values: Agent) {
-    const updatedAgents = [...agents, values]
-    setAgents(updatedAgents)
-    localStorage.setItem("agents", JSON.stringify(updatedAgents));
-    toast({
-      title: "Agent Registered",
-      description: `Successfully registered ${values.name}.`,
-    })
-    setOpen(false)
-    form.reset()
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await addDoc(collection(db, "agents"), values);
+      toast({
+        title: "Agent Registered",
+        description: `Successfully registered ${values.name}.`,
+      })
+      setOpen(false)
+      form.reset()
+    } catch (error) {
+      console.error("Error adding agent: ", error);
+      toast({
+        title: "Error",
+        description: "Failed to register agent.",
+        variant: "destructive"
+      })
+    }
   }
   
   const handleRowClick = (agent: Agent) => {
@@ -376,7 +407,7 @@ export default function AgentPerformancePage() {
                             <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client Name</TableHead><TableHead>KYC Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {agentClients.length > 0 ? agentClients.map(c => (
-                                    <TableRow key={c.shopId}><TableCell>{c.shopId}</TableCell><TableCell>{c.clientName}</TableCell><TableCell>{format(c.kycCompletedDate, "PPP")}</TableCell><TableCell><Badge variant={c.status === 'Active' ? 'default' : c.status === 'In Process' ? 'secondary' : 'destructive'}>{c.status}</Badge></TableCell></TableRow>
+                                    <TableRow key={c.id}><TableCell>{c.shopId}</TableCell><TableCell>{c.clientName}</TableCell><TableCell>{format(c.kycCompletedDate, "PPP")}</TableCell><TableCell><Badge variant={c.status === 'Active' ? 'default' : c.status === 'In Process' ? 'secondary' : 'destructive'}>{c.status}</Badge></TableCell></TableRow>
                                 )) : <TableRow><TableCell colSpan={4} className="text-center">No clients found for this agent.</TableCell></TableRow>}
                             </TableBody>
                         </Table>
@@ -389,7 +420,7 @@ export default function AgentPerformancePage() {
                                      <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead>Amount</TableHead></TableRow></TableHeader>
                                      <TableBody>
                                         {agentDeposits.length > 0 ? agentDeposits.map((d,i) => (
-                                            <TableRow key={`dep-${i}`}><TableCell>{d.shopId}</TableCell><TableCell>{d.clientName}</TableCell><TableCell>{format(d.date, "PPP")}</TableCell><TableCell>${d.amount.toFixed(2)}</TableCell></TableRow>
+                                            <TableRow key={d.id}><TableCell>{d.shopId}</TableCell><TableCell>{d.clientName}</TableCell><TableCell>{format(d.date, "PPP")}</TableCell><TableCell>${d.amount.toFixed(2)}</TableCell></TableRow>
                                         )) : <TableRow><TableCell colSpan={4} className="text-center">No deposits found.</TableCell></TableRow>}
                                     </TableBody>
                                 </Table>
@@ -400,7 +431,7 @@ export default function AgentPerformancePage() {
                                      <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead>Amount</TableHead></TableRow></TableHeader>
                                      <TableBody>
                                         {agentWithdrawals.length > 0 ? agentWithdrawals.map((w,i) => (
-                                            <TableRow key={`wit-${i}`}><TableCell>{w.shopId}</TableCell><TableCell>{w.clientName}</TableCell><TableCell>{format(w.date, "PPP")}</TableCell><TableCell>${w.amount.toFixed(2)}</TableCell></TableRow>
+                                            <TableRow key={w.id}><TableCell>{w.shopId}</TableCell><TableCell>{w.clientName}</TableCell><TableCell>{format(w.date, "PPP")}</TableCell><TableCell>${w.amount.toFixed(2)}</TableCell></TableRow>
                                         )) : <TableRow><TableCell colSpan={4} className="text-center">No withdrawals found.</TableCell></TableRow>}
                                     </TableBody>
                                 </Table>
@@ -435,7 +466,7 @@ export default function AgentPerformancePage() {
                                     <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Remarks</TableHead></TableRow></TableHeader>
                                     <TableBody>
                                         {agentAbsences.length > 0 ? agentAbsences.map((a,i) => (
-                                            <TableRow key={`abs-${i}`}><TableCell>{format(a.date, "PPP")}</TableCell><TableCell>{a.remarks}</TableCell></TableRow>
+                                            <TableRow key={a.id}><TableCell>{format(a.date, "PPP")}</TableCell><TableCell>{a.remarks}</TableCell></TableRow>
                                         )) : <TableRow><TableCell colSpan={2} className="text-center">No absences found.</TableCell></TableRow>}
                                     </TableBody>
                                 </Table>
@@ -446,7 +477,7 @@ export default function AgentPerformancePage() {
                                     <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Remarks</TableHead><TableHead>Amount</TableHead></TableRow></TableHeader>
                                     <TableBody>
                                         {agentPenalties.length > 0 ? agentPenalties.map((p,i) => (
-                                            <TableRow key={`pen-${i}`}><TableCell>{format(p.date, "PPP")}</TableCell><TableCell>{p.remarks}</TableCell><TableCell>${p.amount.toFixed(2)}</TableCell></TableRow>
+                                            <TableRow key={p.id}><TableCell>{format(p.date, "PPP")}</TableCell><TableCell>{p.remarks}</TableCell><TableCell>${p.amount.toFixed(2)}</TableCell></TableRow>
                                         )) : <TableRow><TableCell colSpan={3} className="text-center">No penalties found.</TableCell></TableRow>}
                                     </TableBody>
                                 </Table>
@@ -458,7 +489,7 @@ export default function AgentPerformancePage() {
                             <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {agentRewards.length > 0 ? agentRewards.map((r,i) => (
-                                    <TableRow key={`rew-${i}`}><TableCell>{format(r.date, "PPP")}</TableCell><TableCell>{r.remarks}</TableCell><TableCell><Badge variant={r.status === 'Claimed' ? 'secondary' : 'default'}>{r.status}</Badge></TableCell></TableRow>
+                                    <TableRow key={r.id}><TableCell>{format(r.date, "PPP")}</TableCell><TableCell>{r.remarks}</TableCell><TableCell><Badge variant={r.status === 'Claimed' ? 'secondary' : 'default'}>{r.status}</Badge></TableCell></TableRow>
                                 )) : <TableRow><TableCell colSpan={3} className="text-center">No rewards found for this agent.</TableCell></TableRow>}
                             </TableBody>
                         </Table>
@@ -478,8 +509,8 @@ export default function AgentPerformancePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {agents.map((agent, index) => (
-                <TableRow key={index} onClick={() => handleRowClick(agent)} className="cursor-pointer">
+              {agents.map((agent) => (
+                <TableRow key={agent.id} onClick={() => handleRowClick(agent)} className="cursor-pointer">
                   <TableCell>{agent.name}</TableCell>
                   <TableCell>{agent.email}</TableCell>
                   <TableCell>{format(agent.dateHired, "PPP")}</TableCell>
@@ -504,5 +535,3 @@ export default function AgentPerformancePage() {
     </div>
   )
 }
-
-    

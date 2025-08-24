@@ -2,10 +2,12 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { format, getMonth, getYear, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, Timestamp } from "firebase/firestore";
 
 type Client = {
   kycCompletedDate: Date;
@@ -37,20 +39,22 @@ export default function Home() {
   }));
 
   useEffect(() => {
-    // Load data from localStorage
-    const storedClients = localStorage.getItem("clients");
-    if (storedClients) {
-        setAllClients(JSON.parse(storedClients).map((c: any) => ({ ...c, kycCompletedDate: new Date(c.kycCompletedDate) })));
-    }
+    const unsubscribeClients = onSnapshot(query(collection(db, "clients")), (snapshot) => {
+        setAllClients(snapshot.docs.map(doc => ({ ...doc.data(), kycCompletedDate: (doc.data().kycCompletedDate as Timestamp).toDate() } as Client)));
+    });
 
-    const storedDeposits = localStorage.getItem("deposits");
-    if (storedDeposits) {
-        setAllDeposits(JSON.parse(storedDeposits).map((d: any) => ({ ...d, date: new Date(d.date) })));
-    }
+    const unsubscribeDeposits = onSnapshot(query(collection(db, "deposits")), (snapshot) => {
+        setAllDeposits(snapshot.docs.map(doc => ({ ...doc.data(), date: (doc.data().date as Timestamp).toDate() } as Transaction)));
+    });
     
-    const storedWithdrawals = localStorage.getItem("withdrawals");
-    if (storedWithdrawals) {
-        setAllWithdrawals(JSON.parse(storedWithdrawals).map((w: any) => ({ ...w, date: new Date(w.date) })));
+    const unsubscribeWithdrawals = onSnapshot(query(collection(db, "withdrawals")), (snapshot) => {
+        setAllWithdrawals(snapshot.docs.map(doc => ({ ...doc.data(), date: (doc.data().date as Timestamp).toDate() } as Transaction)));
+    });
+
+    return () => {
+        unsubscribeClients();
+        unsubscribeDeposits();
+        unsubscribeWithdrawals();
     }
   }, []);
 

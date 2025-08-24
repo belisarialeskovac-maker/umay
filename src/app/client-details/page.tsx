@@ -7,6 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
 import { CalendarIcon } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, onSnapshot, query, Timestamp } from "firebase/firestore";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -50,6 +52,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 
 const agentSchema = z.object({
+    id: z.string(),
     name: z.string(),
     email: z.string(),
     dateHired: z.date(),
@@ -71,7 +74,7 @@ const formSchema = z.object({
   clientDetails: z.string(),
 })
 
-type Client = z.infer<typeof formSchema>
+type Client = z.infer<typeof formSchema> & { id: string }
 
 export default function ClientDetailsPage() {
   const [open, setOpen] = useState(false)
@@ -79,7 +82,7 @@ export default function ClientDetailsPage() {
   const [registeredAgents, setRegisteredAgents] = useState<Agent[]>([])
   const { toast } = useToast()
 
-  const form = useForm<Client>({
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       shopId: "",
@@ -91,35 +94,57 @@ export default function ClientDetailsPage() {
   })
 
   useEffect(() => {
-    const storedAgents = localStorage.getItem("agents");
-    if (storedAgents) {
-      const parsedAgents = JSON.parse(storedAgents).map((agent: any) => ({
-        ...agent,
-        dateHired: new Date(agent.dateHired),
-      }));
-      setRegisteredAgents(parsedAgents);
-    }
+    const agentsQuery = query(collection(db, "agents"));
+    const unsubscribeAgents = onSnapshot(agentsQuery, (querySnapshot) => {
+        const agentsData: Agent[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            agentsData.push({ 
+              ...data, 
+              id: doc.id,
+              dateHired: (data.dateHired as Timestamp).toDate()
+            } as Agent);
+        });
+        setRegisteredAgents(agentsData);
+    });
 
-    const storedClients = localStorage.getItem("clients");
-    if (storedClients) {
-        const parsedClients = JSON.parse(storedClients).map((client: any) => ({
-            ...client,
-            kycCompletedDate: new Date(client.kycCompletedDate),
-        }));
-        setClients(parsedClients);
+    const clientsQuery = query(collection(db, "clients"));
+    const unsubscribeClients = onSnapshot(clientsQuery, (querySnapshot) => {
+        const clientsData: Client[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            clientsData.push({ 
+              ...data, 
+              id: doc.id,
+              kycCompletedDate: (data.kycCompletedDate as Timestamp).toDate()
+            } as Client);
+        });
+        setClients(clientsData);
+    });
+    
+    return () => {
+        unsubscribeAgents();
+        unsubscribeClients();
     }
   }, []);
 
-  function onSubmit(values: Client) {
-    const updatedClients = [...clients, values]
-    setClients(updatedClients)
-    localStorage.setItem("clients", JSON.stringify(updatedClients));
-    toast({
-      title: "Client Added",
-      description: `Successfully added ${values.clientName}.`,
-    })
-    setOpen(false)
-    form.reset()
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await addDoc(collection(db, "clients"), values);
+      toast({
+        title: "Client Added",
+        description: `Successfully added ${values.clientName}.`,
+      })
+      setOpen(false)
+      form.reset()
+    } catch(error) {
+      console.error("Error adding client: ", error);
+      toast({
+        title: "Error",
+        description: "Failed to add client.",
+        variant: "destructive"
+      });
+    }
   }
 
   return (
@@ -176,7 +201,7 @@ export default function ClientDetailsPage() {
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                         <SelectContent>
-                        {registeredAgents.map(agent => <SelectItem key={agent.name} value={agent.name}>{agent.name}</SelectItem>)}
+                        {registeredAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
                         </SelectContent>
                     </Select>
                     <FormMessage />
@@ -279,8 +304,8 @@ export default function ClientDetailsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.map((client, index) => (
-                <TableRow key={index}>
+              {clients.map((client) => (
+                <TableRow key={client.id}>
                   <TableCell>{client.shopId}</TableCell>
                   <TableCell>{client.clientName}</TableCell>
                   <TableCell>{client.agent}</TableCell>

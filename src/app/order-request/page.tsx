@@ -6,6 +6,8 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Check, X, Hourglass, ThumbsUp, ThumbsDown } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, updateDoc, onSnapshot, query, doc, Timestamp, where } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button"
 import {
@@ -52,6 +54,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 
 const agentSchema = z.object({
+  id: z.string(),
   name: z.string(),
   email: z.string(),
   dateHired: z.date(),
@@ -60,6 +63,7 @@ const agentSchema = z.object({
 type Agent = z.infer<typeof agentSchema>;
 
 const clientSchema = z.object({
+  id: z.string(),
   agent: z.string(),
   shopId: z.string(),
   clientName: z.string(),
@@ -78,7 +82,7 @@ const formSchema = z.object({
 })
 
 type Order = z.infer<typeof formSchema> & {
-  id: number;
+  id: string;
   status: OrderStatus;
 }
 
@@ -108,49 +112,70 @@ export default function OrderRequestPage() {
   }, [watchedAgent, clients]);
 
   useEffect(() => {
-    const storedAgents = localStorage.getItem("agents");
-    if (storedAgents) {
-      setRegisteredAgents(JSON.parse(storedAgents).map((a: any) => ({ ...a, dateHired: new Date(a.dateHired) })));
-    }
+    const agentsQuery = query(collection(db, "agents"));
+    const unsubscribeAgents = onSnapshot(agentsQuery, (snapshot) => {
+      const agentsData: Agent[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), dateHired: (doc.data().dateHired as Timestamp).toDate() } as Agent));
+      setRegisteredAgents(agentsData);
+    });
 
-    const storedClients = localStorage.getItem("clients");
-    if (storedClients) {
-      setClients(JSON.parse(storedClients));
-    }
+    const clientsQuery = query(collection(db, "clients"));
+    const unsubscribeClients = onSnapshot(clientsQuery, (snapshot) => {
+      const clientsData: Client[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
+      setClients(clientsData);
+    });
     
-    const storedOrders = localStorage.getItem("orders");
-    if (storedOrders) {
-        setOrders(JSON.parse(storedOrders));
-    }
+    const ordersQuery = query(collection(db, "orders"));
+    const unsubscribeOrders = onSnapshot(ordersQuery, (snapshot) => {
+      const ordersData: Order[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+      setOrders(ordersData);
+    });
+
+    return () => {
+      unsubscribeAgents();
+      unsubscribeClients();
+      unsubscribeOrders();
+    };
   }, []);
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    const newOrder: Order = {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    const newOrder = {
         ...values,
-        id: new Date().getTime(),
         status: 'Pending',
     }
-    const updatedOrders = [...orders, newOrder]
-    setOrders(updatedOrders)
-    localStorage.setItem("orders", JSON.stringify(updatedOrders));
-    toast({
-      title: "Order Requested",
-      description: `Successfully requested order for Shop ID ${values.shopId}.`,
-    })
-    setOpen(false)
-    form.reset()
+    try {
+      await addDoc(collection(db, "orders"), newOrder);
+      toast({
+        title: "Order Requested",
+        description: `Successfully requested order for Shop ID ${values.shopId}.`,
+      })
+      setOpen(false)
+      form.reset()
+    } catch (error) {
+      console.error("Error adding order: ", error);
+      toast({
+        title: "Error",
+        description: "Failed to request order.",
+        variant: "destructive"
+      });
+    }
   }
   
-  const updateOrderStatus = (orderId: number, newStatus: OrderStatus) => {
-    const updatedOrders = orders.map(order => 
-        order.id === orderId ? {...order, status: newStatus} : order
-    );
-    setOrders(updatedOrders);
-    localStorage.setItem("orders", JSON.stringify(updatedOrders));
-    toast({
-        title: "Order Status Updated",
-        description: `Order has been moved to ${newStatus}.`
-    })
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    try {
+      const orderRef = doc(db, "orders", orderId);
+      await updateDoc(orderRef, { status: newStatus });
+      toast({
+          title: "Order Status Updated",
+          description: `Order has been moved to ${newStatus}.`
+      })
+    } catch(error) {
+       console.error("Error updating order status: ", error);
+       toast({
+        title: "Error",
+        description: "Failed to update order status.",
+        variant: "destructive"
+      });
+    }
   }
 
   const renderOrderTable = (status: OrderStatus) => {
@@ -246,7 +271,7 @@ export default function OrderRequestPage() {
                         </FormControl>
                         <SelectContent>
                           {registeredAgents.map((agent) => (
-                            <SelectItem key={agent.name} value={agent.name}>
+                            <SelectItem key={agent.id} value={agent.name}>
                               {agent.name}
                             </SelectItem>
                           ))}
@@ -270,7 +295,7 @@ export default function OrderRequestPage() {
                         </FormControl>
                         <SelectContent>
                           {agentClients.map((client) => (
-                            <SelectItem key={client.shopId} value={client.shopId}>
+                            <SelectItem key={client.id} value={client.shopId}>
                               {client.shopId} ({client.clientName})
                             </SelectItem>
                           ))}

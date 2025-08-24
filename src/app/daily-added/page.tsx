@@ -8,6 +8,8 @@ import { z } from 'zod';
 import { format, isToday, isThisMonth } from 'date-fns';
 import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays, Trash2, BarChart } from 'lucide-react';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+import { db } from "@/lib/firebase";
+import { collection, addDoc, onSnapshot, query, deleteDoc, doc, getDocs, Timestamp } from "firebase/firestore";
 
 import { Button } from '@/components/ui/button';
 import {
@@ -50,6 +52,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const agentSchema = z.object({
+  id: z.string(),
   name: z.string(),
   email: z.string(),
   dateHired: z.date(),
@@ -65,6 +68,7 @@ const clientFormSchema = z.object({
 type ClientForm = z.infer<typeof clientFormSchema>;
 
 type Client = {
+    id: string;
     name: string;
     age: number;
     location: string;
@@ -99,11 +103,7 @@ export default function DailyAddedPage() {
     },
   });
 
-  const calculateStats = useCallback(() => {
-    const allDailyClients: Client[] = JSON.parse(localStorage.getItem('dailyAddedClients') || '[]').map((c: any) => ({...c, date: new Date(c.date)}));
-    setAllClients(allDailyClients);
-    const currentAgents: Agent[] = JSON.parse(localStorage.getItem('agents') || '[]').map((a: any) => ({...a, dateHired: new Date(a.dateHired)}));
-
+  const calculateStats = useCallback((allDailyClients: Client[], currentAgents: Agent[]) => {
     const daily = allDailyClients.filter(c => isToday(new Date(c.date)));
     const monthly = allDailyClients.filter(c => isThisMonth(new Date(c.date)));
 
@@ -132,16 +132,37 @@ export default function DailyAddedPage() {
   }, []);
 
   useEffect(() => {
-    const storedAgents = localStorage.getItem("agents");
-    if (storedAgents) {
-      const parsedAgents = JSON.parse(storedAgents).map((agent: any) => ({
-        ...agent,
-        dateHired: new Date(agent.dateHired),
-      }));
-      setRegisteredAgents(parsedAgents);
-    }
+    const agentsQuery = query(collection(db, "agents"));
+    const unsubscribeAgents = onSnapshot(agentsQuery, (querySnapshot) => {
+        const agentsData: Agent[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            agentsData.push({ 
+              ...data, 
+              id: doc.id,
+              dateHired: (data.dateHired as Timestamp).toDate()
+            } as Agent);
+        });
+        setRegisteredAgents(agentsData);
+
+        const clientsQuery = query(collection(db, "dailyAddedClients"));
+        const unsubscribeClients = onSnapshot(clientsQuery, (clientSnapshot) => {
+            const clientsData: Client[] = [];
+            clientSnapshot.forEach((doc) => {
+                const data = doc.data();
+                clientsData.push({ 
+                  ...data, 
+                  id: doc.id,
+                  date: (data.date as Timestamp).toDate()
+                } as Client);
+            });
+            setAllClients(clientsData);
+            calculateStats(clientsData, agentsData);
+        });
+        return () => unsubscribeClients();
+    });
     
-    calculateStats();
+    return () => unsubscribeAgents();
   }, [calculateStats]);
 
   const ageData = useMemo(() => {
@@ -167,7 +188,7 @@ export default function DailyAddedPage() {
   }, [allClients]);
 
 
-  const handleAddClient = () => {
+  const handleAddClient = async () => {
     const agentValue = form.getValues('assignedAgent');
     if (!agentValue) {
         form.setError("assignedAgent", { type: "manual", message: "Please select an agent."});
@@ -197,13 +218,11 @@ export default function DailyAddedPage() {
         let name: string, age: number, location: string, work: string;
 
         if (nameMatch || ageMatch || locMatch || workMatch) {
-            // Labeled format parsing
             name = nameMatch ? nameMatch[1].trim() : 'N/A';
             age = ageMatch ? parseInt(ageMatch[1], 10) : 0;
             location = locMatch ? locMatch[1].trim() : 'N/A';
             work = workMatch ? workMatch[1].trim() : 'N/A';
         } else {
-            // Label-less format parsing
             const lines = pastedDetails.split('\n').map(line => line.trim()).filter(line => line);
             if (lines.length >= 4) {
                 name = lines[0];
@@ -219,7 +238,7 @@ export default function DailyAddedPage() {
             throw new Error("Could not parse all details. Please check the format.");
         }
 
-        const newClient: Client = {
+        const newClientData = {
           name,
           age,
           location,
@@ -228,12 +247,10 @@ export default function DailyAddedPage() {
           date: new Date(),
         };
 
-        setSessionClients((prevClients) => [...prevClients, newClient]);
+        const docRef = await addDoc(collection(db, 'dailyAddedClients'), newClientData);
         
-        const allDailyClients = JSON.parse(localStorage.getItem('dailyAddedClients') || '[]');
-        allDailyClients.push(newClient);
-        localStorage.setItem('dailyAddedClients', JSON.stringify(allDailyClients));
-
+        setSessionClients((prevClients) => [...prevClients, { ...newClientData, id: docRef.id }]);
+        
         toast({
           title: 'Client Added',
           description: `${name} has been successfully added.`,
@@ -241,8 +258,6 @@ export default function DailyAddedPage() {
 
         form.reset({ assignedAgent: "" });
         setPastedDetails('');
-        
-        calculateStats();
 
     } catch (error: any) {
         toast({
@@ -253,14 +268,28 @@ export default function DailyAddedPage() {
     }
   }
 
-  const handleClearData = () => {
-    localStorage.removeItem('dailyAddedClients');
-    setSessionClients([]);
-    calculateStats();
-    toast({
-        title: "Data Cleared",
-        description: "All daily added client data has been cleared."
-    })
+  const handleClearData = async () => {
+    try {
+        const querySnapshot = await getDocs(collection(db, 'dailyAddedClients'));
+        const deletePromises: Promise<void>[] = [];
+        querySnapshot.forEach((docSnapshot) => {
+            deletePromises.push(deleteDoc(doc(db, 'dailyAddedClients', docSnapshot.id)));
+        });
+        await Promise.all(deletePromises);
+
+        setSessionClients([]);
+        toast({
+            title: "Data Cleared",
+            description: "All daily added client data has been cleared from the database."
+        })
+    } catch (error) {
+        console.error("Error clearing data: ", error);
+        toast({
+            title: "Error",
+            description: "Failed to clear client data.",
+            variant: "destructive"
+        })
+    }
   }
 
   return (
@@ -282,7 +311,7 @@ export default function DailyAddedPage() {
                     <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete all daily added client data from your browser's storage.
+                        This action cannot be undone. This will permanently delete all daily added client data from your database.
                     </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -300,7 +329,6 @@ export default function DailyAddedPage() {
             </TabsList>
             <TabsContent value="dashboard">
                 <div className="space-y-8">
-                    {/* Dashboard Section */}
                     <div>
                         <h2 className="text-xl font-semibold mb-4 flex items-center"><TrendingUp className="mr-2 h-5 w-5" /> Overall Performance</h2>
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -354,7 +382,6 @@ export default function DailyAddedPage() {
                         </div>
                     </div>
 
-                    {/* Parsing Area */}
                     <div>
                         <h2 className="text-xl font-semibold mb-4 flex items-center"><TextSearch className="mr-2 h-5 w-5" /> Parsing Area</h2>
                         <div className='space-y-4'>
@@ -384,7 +411,7 @@ export default function DailyAddedPage() {
                                                 </FormControl>
                                                 <SelectContent>
                                                 {registeredAgents.map((agent) => (
-                                                    <SelectItem key={agent.name} value={agent.name}>
+                                                    <SelectItem key={agent.id} value={agent.name}>
                                                     {agent.name}
                                                     </SelectItem>
                                                 ))}
@@ -402,7 +429,6 @@ export default function DailyAddedPage() {
                         </div>
                     </div>
                     
-                    {/* Table Area */}
                     <div>
                         <h2 className="text-xl font-semibold mb-4">Added This Session</h2>
                         {sessionClients.length > 0 ? (
@@ -419,8 +445,8 @@ export default function DailyAddedPage() {
                                 </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                {sessionClients.map((client, index) => (
-                                    <TableRow key={index}>
+                                {sessionClients.map((client) => (
+                                    <TableRow key={client.id}>
                                     <TableCell>{client.name}</TableCell>
                                     <TableCell>{client.age}</TableCell>
                                     <TableCell>{client.location}</TableCell>
@@ -469,5 +495,3 @@ export default function DailyAddedPage() {
     </div>
   );
 }
-
-    

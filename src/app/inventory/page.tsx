@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, doc, serverTimestamp, getDocs } from "firebase/firestore"
 
 import InventoryTable from "./components/inventory-table"
 import AddDeviceForm from "./components/add-device-form"
@@ -20,8 +22,8 @@ export type DeviceInventory = {
   appleIdUsername?: string
   appleIdPassword?: string
   remarks?: string
-  createdAt: string
-  updatedAt: string
+  createdAt: any // Firestore Timestamp
+  updatedAt: any // Firestore Timestamp
 }
 
 export type AgentStats = {
@@ -29,6 +31,7 @@ export type AgentStats = {
 }
 
 type Agent = {
+    id: string;
     name: string;
 }
 
@@ -44,30 +47,30 @@ export default function InventoryPage() {
 
   useEffect(() => {
     setLoading(true)
-    try {
-      const storedInventory = localStorage.getItem("inventory")
-      const storedAgents = localStorage.getItem("agents");
+    const inventoryQuery = query(collection(db, "inventory"));
+    const unsubscribeInventory = onSnapshot(inventoryQuery, (snapshot) => {
+        const inventoryData: DeviceInventory[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DeviceInventory));
+        setDevices(inventoryData);
+        setFilteredDevices(inventoryData);
+        updateAgentStats(inventoryData);
+        setLoading(false);
+    }, (error) => {
+        console.error("Error fetching inventory:", error);
+        toast({ title: "Error", description: "Failed to load inventory data.", variant: "destructive" });
+        setLoading(false);
+    });
 
-      if (storedInventory) {
-        const inventoryData: DeviceInventory[] = JSON.parse(storedInventory)
-        setDevices(inventoryData)
-        setFilteredDevices(inventoryData)
-        updateAgentStats(inventoryData)
-      }
-      if (storedAgents) {
-          setRegisteredAgents(JSON.parse(storedAgents));
-      }
-    } catch (error) {
-      console.error("Error loading data from localStorage:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load inventory data from your browser's storage.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
+    const agentsQuery = query(collection(db, "agents"));
+    const unsubscribeAgents = onSnapshot(agentsQuery, (snapshot) => {
+        const agentsData: Agent[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Agent));
+        setRegisteredAgents(agentsData);
+    });
+
+    return () => {
+        unsubscribeInventory();
+        unsubscribeAgents();
     }
-  }, [toast, activeTab])
+  }, [toast]);
 
   const agentNames = useMemo(() => registeredAgents.map(a => a.name), [registeredAgents]);
 
@@ -101,8 +104,9 @@ export default function InventoryPage() {
 
   const addDevice = async (device: Omit<DeviceInventory, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const isDuplicate = devices.some((d) => d.imei === device.imei)
-      if (isDuplicate) {
+      const q = query(collection(db, "inventory"), where("imei", "==", device.imei));
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
         toast({
           title: "Error",
           description: "This IMEI already exists in the inventory",
@@ -111,19 +115,13 @@ export default function InventoryPage() {
         return false
       }
 
-      const newDevice: DeviceInventory = {
+      const newDevice = {
         ...device,
-        id: new Date().getTime().toString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       }
       
-      const updatedDevices = [...devices, newDevice]
-      localStorage.setItem("inventory", JSON.stringify(updatedDevices))
-      setDevices(updatedDevices)
-      setFilteredDevices(updatedDevices)
-      updateAgentStats(updatedDevices);
-
+      await addDoc(collection(db, "inventory"), newDevice);
 
       toast({
         title: "Success",
@@ -143,10 +141,12 @@ export default function InventoryPage() {
     }
   }
 
-  const updateDevice = async (id: string, updatedDevice: Partial<DeviceInventory>) => {
+  const updateDevice = async (id: string, updatedDeviceData: Partial<Omit<DeviceInventory, 'id'>>) => {
     try {
-      if (updatedDevice.imei) {
-        const isDuplicate = devices.some((d) => d.id !== id && d.imei === updatedDevice.imei)
+      if (updatedDeviceData.imei) {
+        const q = query(collection(db, "inventory"), where("imei", "==", updatedDeviceData.imei));
+        const querySnapshot = await getDocs(q);
+        const isDuplicate = !querySnapshot.empty && querySnapshot.docs.some(doc => doc.id !== id);
         if (isDuplicate) {
           toast({
             title: "Error",
@@ -157,21 +157,11 @@ export default function InventoryPage() {
         }
       }
       
-      const updatedDevices = devices.map(d => {
-        if (d.id === id) {
-            return {
-                ...d,
-                ...updatedDevice,
-                updatedAt: new Date().toISOString(),
-            }
-        }
-        return d;
+      const deviceRef = doc(db, "inventory", id);
+      await updateDoc(deviceRef, {
+        ...updatedDeviceData,
+        updatedAt: serverTimestamp(),
       });
-
-      localStorage.setItem("inventory", JSON.stringify(updatedDevices));
-      setDevices(updatedDevices);
-      setFilteredDevices(updatedDevices);
-      updateAgentStats(updatedDevices);
 
       toast({
         title: "Success",
@@ -191,12 +181,7 @@ export default function InventoryPage() {
 
   const deleteDevice = async (id: string) => {
     try {
-      const updatedDevices = devices.filter(d => d.id !== id);
-      localStorage.setItem("inventory", JSON.stringify(updatedDevices));
-      setDevices(updatedDevices);
-      setFilteredDevices(updatedDevices);
-      updateAgentStats(updatedDevices);
-
+      await deleteDoc(doc(db, "inventory", id));
       toast({
         title: "Success",
         description: "Device deleted successfully",

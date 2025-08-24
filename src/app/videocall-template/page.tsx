@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
+import { db } from "@/lib/firebase";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 
 import {
   Dialog,
@@ -94,19 +96,6 @@ const initialFormData: FormData = {
   location: "",
   work: "",
   kids: "",
-
-  // Client Details
-  clientName: "",
-  clientLocation: "",
-  clientWork: "",
-  clientnickname: "",
-  clientweather: "",
-
-  // Topics
-  beforeCall: "",
-  afterCall: "",
-  kidLocation: "",
-  remarks: "",
   previousLocation: "",
   divorce: "",
   pet: "",
@@ -115,9 +104,22 @@ const initialFormData: FormData = {
   plans: "",
   ethnicity: "",
   car: "",
+
+  // Client Details
+  clientName: "",
+  clientLocation: "",
+  clientWork: "",
+  clientnickname: "",
+  clientweather: "",
   hobbies: "",
   clientkid: "",
   clientweekend: "",
+
+  // Topics
+  beforeCall: "",
+  afterCall: "",
+  kidLocation: "",
+  remarks: "",
 }
 
 const requiredFields: (keyof FormData)[] = [
@@ -181,14 +183,14 @@ export default function VideoCallTemplatePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    try {
-        const savedData = localStorage.getItem("videoCallFormData");
-        if (savedData) {
-            setFormData(JSON.parse(savedData));
+    const loadData = async () => {
+        const docRef = doc(db, "singleDocs", "videoCallFormData");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            setFormData(docSnap.data() as FormData);
         }
-    } catch (error) {
-        console.error("Failed to parse form data from localStorage", error);
     }
+    loadData().catch(err => console.error("Failed to load form data from Firestore", err));
   }, []);
 
   const getFieldsToCheck = useCallback(() => {
@@ -212,7 +214,14 @@ export default function VideoCallTemplatePage() {
   useEffect(() => {
     if (isMounted) {
         updateProgress();
-        localStorage.setItem("videoCallFormData", JSON.stringify(formData));
+        const saveData = async () => {
+            try {
+                await setDoc(doc(db, "singleDocs", "videoCallFormData"), formData);
+            } catch (error) {
+                console.error("Failed to save form data to Firestore", error);
+            }
+        };
+        saveData();
     }
   }, [formData, isMounted, updateProgress]);
 
@@ -416,13 +425,18 @@ export default function VideoCallTemplatePage() {
     })
   }
 
-  const handleReset = () => {
-    if (confirm("Are you sure you want to reset the form? All data will be lost.")) {
+  const handleReset = async () => {
+    if (confirm("Are you sure you want to reset the form? All data will be lost from the database.")) {
       setFormData(initialFormData)
-      localStorage.removeItem("videoCallFormData")
-      setPdfUrl(null)
-      setExpandedSections({ model: true, client: false, topics: false })
-      toast({ title: "Form Reset", description: "All form data has been cleared." })
+      try {
+        await setDoc(doc(db, "singleDocs", "videoCallFormData"), initialFormData);
+        setPdfUrl(null)
+        setExpandedSections({ model: true, client: false, topics: false })
+        toast({ title: "Form Reset", description: "All form data has been cleared from the database." })
+      } catch (error) {
+        console.error("Failed to reset form data in Firestore", error);
+        toast({ title: "Error", description: "Failed to reset form data.", variant: "destructive"})
+      }
     }
   }
 
@@ -686,5 +700,3 @@ export default function VideoCallTemplatePage() {
     </div>
   )
 }
-
-    

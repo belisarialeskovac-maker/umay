@@ -7,6 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
 import { CalendarIcon } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, onSnapshot, query, Timestamp } from "firebase/firestore";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -49,6 +51,7 @@ import { useToast } from "@/hooks/use-toast"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 const clientSchema = z.object({
+    id: z.string(),
     shopId: z.string(),
     clientName: z.string(),
     agent: z.string(),
@@ -72,7 +75,7 @@ const formSchema = z.object({
   paymentMode: z.enum(paymentModes),
 })
 
-type Withdrawal = z.infer<typeof formSchema>
+type Withdrawal = z.infer<typeof formSchema> & { id: string }
 
 export default function WithdrawalPage() {
   const [open, setOpen] = useState(false)
@@ -80,7 +83,7 @@ export default function WithdrawalPage() {
   const [clients, setClients] = useState<Client[]>([])
   const { toast } = useToast()
 
-  const form = useForm<Withdrawal>({
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       shopId: "",
@@ -95,22 +98,37 @@ export default function WithdrawalPage() {
   const watchedShopId = form.watch("shopId");
 
   useEffect(() => {
-    const storedClients = localStorage.getItem("clients");
-    if (storedClients) {
-      const parsedClients = JSON.parse(storedClients).map((client: any) => ({
-        ...client,
-        kycCompletedDate: new Date(client.kycCompletedDate),
-      }));
-      setClients(parsedClients);
-    }
+    const clientsQuery = query(collection(db, "clients"));
+    const unsubscribeClients = onSnapshot(clientsQuery, (querySnapshot) => {
+        const clientsData: Client[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            clientsData.push({ 
+              ...data, 
+              id: doc.id,
+              kycCompletedDate: (data.kycCompletedDate as Timestamp).toDate()
+            } as Client);
+        });
+        setClients(clientsData);
+    });
 
-    const storedWithdrawals = localStorage.getItem("withdrawals");
-    if (storedWithdrawals) {
-        const parsedWithdrawals = JSON.parse(storedWithdrawals).map((withdrawal: any) => ({
-            ...withdrawal,
-            date: new Date(withdrawal.date),
-        }));
-        setWithdrawals(parsedWithdrawals);
+    const withdrawalsQuery = query(collection(db, "withdrawals"));
+    const unsubscribeWithdrawals = onSnapshot(withdrawalsQuery, (querySnapshot) => {
+        const withdrawalsData: Withdrawal[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            withdrawalsData.push({ 
+              ...data, 
+              id: doc.id,
+              date: (data.date as Timestamp).toDate()
+            } as Withdrawal);
+        });
+        setWithdrawals(withdrawalsData);
+    });
+
+    return () => {
+        unsubscribeClients();
+        unsubscribeWithdrawals();
     }
   }, []);
   
@@ -127,23 +145,30 @@ export default function WithdrawalPage() {
     }
   }, [watchedShopId, clients, form]);
 
-  function onSubmit(values: Withdrawal) {
-    const updatedWithdrawals = [...withdrawals, values]
-    setWithdrawals(updatedWithdrawals)
-    localStorage.setItem("withdrawals", JSON.stringify(updatedWithdrawals));
-    toast({
-      title: "Withdrawal Added",
-      description: `Successfully added withdrawal for ${values.clientName}.`,
-    })
-    setOpen(false)
-    form.reset({
-        shopId: "",
-        clientName: "",
-        agent: "",
-        paymentMode: "Ewallet/Online Banking",
-        amount: 0,
-        date: new Date(),
-    })
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      await addDoc(collection(db, "withdrawals"), values);
+      toast({
+        title: "Withdrawal Added",
+        description: `Successfully added withdrawal for ${values.clientName}.`,
+      })
+      setOpen(false)
+      form.reset({
+          shopId: "",
+          clientName: "",
+          agent: "",
+          paymentMode: "Ewallet/Online Banking",
+          amount: 0,
+          date: new Date(),
+      })
+    } catch(error) {
+      console.error("Error adding withdrawal: ", error);
+      toast({
+        title: "Error",
+        description: "Failed to add withdrawal.",
+        variant: "destructive"
+      });
+    }
   }
 
   const clientFound = !!watchedShopId && clients.some(c => c.shopId === watchedShopId);
@@ -312,8 +337,8 @@ export default function WithdrawalPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {withdrawals.map((withdrawal, index) => (
-                <TableRow key={index}>
+              {withdrawals.map((withdrawal) => (
+                <TableRow key={withdrawal.id}>
                   <TableCell>{withdrawal.shopId}</TableCell>
                   <TableCell>{withdrawal.clientName}</TableCell>
                   <TableCell>{withdrawal.agent}</TableCell>

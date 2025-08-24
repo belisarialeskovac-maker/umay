@@ -7,6 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format, isToday, isThisMonth } from "date-fns"
 import { CalendarIcon, Edit, Save, X } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, updateDoc, onSnapshot, query, doc, Timestamp, getDoc, setDoc } from "firebase/firestore";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -56,6 +58,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Textarea } from "@/components/ui/textarea"
 
 type Agent = {
+  id: string;
   name: string;
   email: string;
   dateHired: Date;
@@ -63,6 +66,7 @@ type Agent = {
 }
 
 type Client = {
+    id: string;
     shopId: string;
     clientName: string;
     agent: string;
@@ -72,6 +76,7 @@ type Client = {
 }
 
 type DailyAddedClient = {
+    id: string;
     name: string;
     age: number;
     location: string;
@@ -81,6 +86,7 @@ type DailyAddedClient = {
 };
 
 type Transaction = {
+    id: string;
     shopId: string;
     clientName: string;
     agent: string;
@@ -119,9 +125,9 @@ const rewardSchema = z.object({
   status: z.enum(["Claimed", "Unclaimed"]),
 })
 
-type Absence = z.infer<typeof absenceSchema>
-type Penalty = z.infer<typeof penaltySchema>
-type Reward = z.infer<typeof rewardSchema>
+type Absence = z.infer<typeof absenceSchema> & { id: string }
+type Penalty = z.infer<typeof penaltySchema> & { id: string }
+type Reward = z.infer<typeof rewardSchema> & { id: string }
 
 export default function TeamPerformancePage() {
   const [absences, setAbsences] = useState<Absence[]>([])
@@ -139,25 +145,33 @@ export default function TeamPerformancePage() {
   
   const { toast } = useToast()
 
-  const absenceForm = useForm<Absence>({ resolver: zodResolver(absenceSchema), defaultValues: { date: new Date() } })
-  const penaltyForm = useForm<Penalty>({ resolver: zodResolver(penaltySchema), defaultValues: { date: new Date(), amount: 0 } })
-  const rewardForm = useForm<Reward>({ resolver: zodResolver(rewardSchema), defaultValues: { date: new Date(), status: "Unclaimed"} })
+  const absenceForm = useForm<z.infer<typeof absenceSchema>>({ resolver: zodResolver(absenceSchema), defaultValues: { date: new Date() } })
+  const penaltyForm = useForm<z.infer<typeof penaltySchema>>({ resolver: zodResolver(penaltySchema), defaultValues: { date: new Date(), amount: 0 } })
+  const rewardForm = useForm<z.infer<typeof rewardSchema>>({ resolver: zodResolver(rewardSchema), defaultValues: { date: new Date(), status: "Unclaimed"} })
 
-  const calculatePerformanceMetrics = useCallback((agents: Agent[]) => {
-    const dailyAddedClients: DailyAddedClient[] = JSON.parse(localStorage.getItem('dailyAddedClients') || '[]').map((c: any) => ({ ...c, date: new Date(c.date) }));
-    const clients: Client[] = JSON.parse(localStorage.getItem('clients') || '[]').map((c: any) => ({ ...c, kycCompletedDate: new Date(c.kycCompletedDate) }));
-    const deposits: Transaction[] = JSON.parse(localStorage.getItem('deposits') || '[]').map((d: any) => ({ ...d, date: new Date(d.date) }));
-    const withdrawals: Transaction[] = JSON.parse(localStorage.getItem('withdrawals') || '[]').map((w: any) => ({ ...w, date: new Date(w.date) }));
-    const storedPerformance: TeamPerformanceData[] = JSON.parse(localStorage.getItem('teamPerformance') || '[]');
+  const calculatePerformanceMetrics = useCallback(async (agents: Agent[]) => {
+    const dailyAddedSnapshot = await getDocs(collection(db, 'dailyAddedClients'));
+    const dailyAddedClients: DailyAddedClient[] = dailyAddedSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as DailyAddedClient));
 
-    const performanceData = agents.map(agent => {
+    const clientsSnapshot = await getDocs(collection(db, 'clients'));
+    const clients: Client[] = clientsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, kycCompletedDate: (doc.data().kycCompletedDate as Timestamp).toDate() } as Client));
+
+    const depositsSnapshot = await getDocs(collection(db, 'deposits'));
+    const deposits: Transaction[] = depositsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as Transaction));
+    
+    const withdrawalsSnapshot = await getDocs(collection(db, 'withdrawals'));
+    const withdrawals: Transaction[] = withdrawalsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, date: (doc.data().date as Timestamp).toDate() } as Transaction));
+
+    const performancePromises = agents.map(async agent => {
         const agentDailyAdded = dailyAddedClients.filter(c => c.assignedAgent === agent.name && isToday(c.date)).length;
         const agentMonthlyAdded = dailyAddedClients.filter(c => c.assignedAgent === agent.name && isThisMonth(c.date)).length;
         const agentOpenAccounts = clients.filter(c => c.agent === agent.name && isThisMonth(c.kycCompletedDate)).length;
         const agentDeposits = deposits.filter(d => d.agent === agent.name && isThisMonth(d.date)).reduce((sum, d) => sum + d.amount, 0);
         const agentWithdrawals = withdrawals.filter(w => w.agent === agent.name && isThisMonth(w.date)).reduce((sum, w) => sum + w.amount, 0);
         
-        const storedAgentData = storedPerformance.find(p => p.agentName === agent.name);
+        const perfDocRef = doc(db, 'teamPerformance', agent.name);
+        const perfDoc = await getDoc(perfDocRef);
+        const storedAgentData = perfDoc.exists() ? perfDoc.data() as TeamPerformanceData : null;
 
         return {
             agentName: agent.name,
@@ -170,55 +184,45 @@ export default function TeamPerformancePage() {
         };
     });
 
+    const performanceData = await Promise.all(performancePromises);
     setTeamPerformance(performanceData);
   }, []);
 
   useEffect(() => {
-    // Load agents
-    const storedAgents = localStorage.getItem("agents");
-    if (storedAgents) {
-      const parsedAgents: Agent[] = JSON.parse(storedAgents).map((agent: any) => ({
-        ...agent,
-        dateHired: new Date(agent.dateHired),
-      }));
+    const unsubAgents = onSnapshot(collection(db, "agents"), (snapshot) => {
+      const parsedAgents: Agent[] = snapshot.docs.map(doc => ({...doc.data(), id: doc.id, dateHired: (doc.data().dateHired as Timestamp).toDate()} as Agent));
       setRegisteredAgents(parsedAgents);
       calculatePerformanceMetrics(parsedAgents);
+    });
+    
+    const unsubAbsences = onSnapshot(collection(db, "absences"), (s) => setAbsences(s.docs.map(d => ({...d.data(), id: d.id, date: (d.data().date as Timestamp).toDate()} as Absence))));
+    const unsubPenalties = onSnapshot(collection(db, "penalties"), (s) => setPenalties(s.docs.map(d => ({...d.data(), id: d.id, date: (d.data().date as Timestamp).toDate()} as Penalty))));
+    const unsubRewards = onSnapshot(collection(db, "rewards"), (s) => setRewards(s.docs.map(d => ({...d.data(), id: d.id, date: (d.data().date as Timestamp).toDate()} as Reward))));
+
+    return () => {
+        unsubAgents();
+        unsubAbsences();
+        unsubPenalties();
+        unsubRewards();
     }
-    
-    // Load absences, penalties, rewards
-    const storedAbsences = localStorage.getItem("absences");
-    if(storedAbsences) setAbsences(JSON.parse(storedAbsences).map((a:any) => ({...a, date: new Date(a.date)})));
-    
-    const storedPenalties = localStorage.getItem("penalties");
-    if(storedPenalties) setPenalties(JSON.parse(storedPenalties).map((p:any) => ({...p, date: new Date(p.date)})));
-
-    const storedRewards = localStorage.getItem("rewards");
-    if(storedRewards) setRewards(JSON.parse(storedRewards).map((r:any) => ({...r, date: new Date(r.date)})));
-
   }, [calculatePerformanceMetrics]);
 
-  const onAbsenceSubmit = (values: Absence) => {
-    const updatedAbsences = [...absences, values];
-    setAbsences(updatedAbsences);
-    localStorage.setItem("absences", JSON.stringify(updatedAbsences));
+  const onAbsenceSubmit = async (values: z.infer<typeof absenceSchema>) => {
+    await addDoc(collection(db, "absences"), values);
     toast({ title: "Absence Recorded", description: `Absence for ${values.agent} has been recorded.` })
     setAbsenceDialogOpen(false)
     absenceForm.reset({agent: '', remarks: '', date: new Date()})
   }
 
-  const onPenaltySubmit = (values: Penalty) => {
-    const updatedPenalties = [...penalties, values];
-    setPenalties(updatedPenalties);
-    localStorage.setItem("penalties", JSON.stringify(updatedPenalties));
+  const onPenaltySubmit = async (values: z.infer<typeof penaltySchema>) => {
+    await addDoc(collection(db, "penalties"), values);
     toast({ title: "Penalty Recorded", description: `Penalty for ${values.agent} has been recorded.` })
     setPenaltyDialogOpen(false)
     penaltyForm.reset({agent: '', remarks: '', amount: 0, date: new Date()})
   }
 
-  const onRewardSubmit = (values: Reward) => {
-    const updatedRewards = [...rewards, values];
-    setRewards(updatedRewards);
-    localStorage.setItem("rewards", JSON.stringify(updatedRewards));
+  const onRewardSubmit = async (values: z.infer<typeof rewardSchema>) => {
+    await addDoc(collection(db, "rewards"), values);
     toast({ title: "Reward Recorded", description: `Reward for ${values.agent} has been recorded.` })
     setRewardDialogOpen(false)
     rewardForm.reset({agent: '', remarks: '', status: 'Unclaimed', date: new Date()})
@@ -237,12 +241,11 @@ export default function TeamPerformancePage() {
     setEditedData({});
   }
   
-  const handleSave = (agentName: string) => {
-    const updatedPerformance = teamPerformance.map(p => 
-        p.agentName === agentName ? { ...p, ...editedData, lastEditedBy: 'Admin' } : p
-    );
-    setTeamPerformance(updatedPerformance);
-    localStorage.setItem('teamPerformance', JSON.stringify(updatedPerformance));
+  const handleSave = async (agentName: string) => {
+    const perfDocRef = doc(db, 'teamPerformance', agentName);
+    const dataToSave = { ...teamPerformance.find(p => p.agentName === agentName), ...editedData, lastEditedBy: 'Admin' };
+    await setDoc(perfDocRef, dataToSave, { merge: true });
+    
     setEditingAgent(null);
     setEditedData({});
     toast({ title: "Performance Updated", description: `Data for ${agentName} has been saved.` });
@@ -358,7 +361,7 @@ export default function TeamPerformancePage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {registeredAgents.map(agent => <SelectItem key={agent.name} value={agent.name}>{agent.name}</SelectItem>)}
+                            {registeredAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -411,8 +414,8 @@ export default function TeamPerformancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {absences.map((item, index) => (
-                    <TableRow key={index}>
+                  {absences.map((item) => (
+                    <TableRow key={item.id}>
                       <TableCell>{format(item.date, "PPP")}</TableCell>
                       <TableCell>{item.agent}</TableCell>
                       <TableCell>{item.remarks}</TableCell>
@@ -448,7 +451,7 @@ export default function TeamPerformancePage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {registeredAgents.map(agent => <SelectItem key={agent.name} value={agent.name}>{agent.name}</SelectItem>)}
+                            {registeredAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -511,8 +514,8 @@ export default function TeamPerformancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {penalties.map((item, index) => (
-                    <TableRow key={index}>
+                  {penalties.map((item) => (
+                    <TableRow key={item.id}>
                       <TableCell>{format(item.date, "PPP")}</TableCell>
                       <TableCell>{item.agent}</TableCell>
                       <TableCell>{item.remarks}</TableCell>
@@ -549,7 +552,7 @@ export default function TeamPerformancePage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {registeredAgents.map(agent => <SelectItem key={agent.name} value={agent.name}>{agent.name}</SelectItem>)}
+                            {registeredAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -616,8 +619,8 @@ export default function TeamPerformancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rewards.map((item, index) => (
-                    <TableRow key={index}>
+                  {rewards.map((item) => (
+                    <TableRow key={item.id}>
                       <TableCell>{format(item.date, "PPP")}</TableCell>
                       <TableCell>{item.agent}</TableCell>
                       <TableCell>{item.remarks}</TableCell>
@@ -644,5 +647,3 @@ export default function TeamPerformancePage() {
     </div>
   )
 }
-
-    
