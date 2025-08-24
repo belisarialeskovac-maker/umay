@@ -6,7 +6,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit/zod';
+import { z } from 'genkit';
 import { getAuth } from 'firebase-admin/auth';
 import { initFirebase } from '@/lib/firebase-admin';
 
