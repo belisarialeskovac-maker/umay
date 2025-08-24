@@ -43,18 +43,29 @@ function DailyAddedPage() {
   const [isAddingClient, setIsAddingClient] = useState(false);
   const { toast } = useToast();
 
+  const [visibleClients, setVisibleClients] = useState<Client[]>([]);
   const [dailyCount, setDailyCount] = useState(0);
   const [monthlyCount, setMonthlyCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [agentStats, setAgentStats] = useState<AgentStats>({});
 
-  const calculateStats = useCallback((allDailyClients: Client[], currentAgents: Agent[]) => {
-    const daily = allDailyClients.filter(c => isToday(new Date(c.date)));
-    const monthly = allDailyClients.filter(c => isThisMonth(new Date(c.date)));
+  useEffect(() => {
+    if (user && !dataLoading) {
+      if (user.role === 'Agent') {
+        setVisibleClients(dailyAddedClients.filter(c => c.assignedAgent === user.name));
+      } else {
+        setVisibleClients(dailyAddedClients);
+      }
+    }
+  }, [user, dailyAddedClients, dataLoading]);
+
+  const calculateStats = useCallback((clientsToProcess: Client[], currentAgents: Agent[]) => {
+    const daily = clientsToProcess.filter(c => isToday(new Date(c.date)));
+    const monthly = clientsToProcess.filter(c => isThisMonth(new Date(c.date)));
 
     setDailyCount(daily.length);
     setMonthlyCount(monthly.length);
-    setTotalCount(allDailyClients.length);
+    setTotalCount(clientsToProcess.length);
 
     const stats: AgentStats = {};
 
@@ -62,7 +73,7 @@ function DailyAddedPage() {
         stats[agent.name] = { daily: 0, monthly: 0 };
     });
 
-    allDailyClients.forEach(client => {
+    clientsToProcess.forEach(client => {
         if(stats[client.assignedAgent]) {
             if (isToday(new Date(client.date))) {
                 stats[client.assignedAgent].daily++;
@@ -77,10 +88,12 @@ function DailyAddedPage() {
   }, []);
 
   useEffect(() => {
-    if (!dataLoading) {
-      calculateStats(dailyAddedClients, agents);
+    if (!dataLoading && user) {
+        // For admins, calculate stats on all clients, for agents, on their own.
+        const statsSource = user.role === 'Agent' ? visibleClients : dailyAddedClients;
+        calculateStats(statsSource, agents);
     }
-  }, [dailyAddedClients, agents, dataLoading, calculateStats]);
+  }, [dailyAddedClients, agents, dataLoading, calculateStats, user, visibleClients]);
 
   const ageData = useMemo(() => {
     const ageGroups = {
@@ -92,7 +105,7 @@ function DailyAddedPage() {
         'Unknown': 0,
     };
 
-    dailyAddedClients.forEach(client => {
+    visibleClients.forEach(client => {
         if (client.age >= 18 && client.age <= 25) ageGroups['18-25']++;
         else if (client.age >= 26 && client.age <= 35) ageGroups['26-35']++;
         else if (client.age >= 36 && client.age <= 45) ageGroups['36-45']++;
@@ -102,7 +115,7 @@ function DailyAddedPage() {
     });
 
     return Object.entries(ageGroups).map(([name, value]) => ({ name, count: value }));
-  }, [dailyAddedClients]);
+  }, [visibleClients]);
 
 
   const handleAddClient = async () => {
@@ -190,7 +203,7 @@ function DailyAddedPage() {
     }
   }
 
-  if (dataLoading) {
+  if (authLoading || dataLoading) {
     return (
         <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -250,23 +263,27 @@ function DailyAddedPage() {
                                 </CardContent>
                             </Card>
                         </div>
-                        <h2 className="text-xl font-semibold my-4 flex items-center"><UserCheckIcon className="mr-2 h-5 w-5" /> Agent Performance</h2>
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                            {Object.keys(agentStats).length > 0 ? Object.entries(agentStats).map(([agent, stats]) => (
-                                <Card key={agent}>
-                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                        <CardTitle className="text-sm font-medium">{agent}</CardTitle>
-                                        <UserCheckIcon className="h-4 w-4 text-muted-foreground" />
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="text-2xl font-bold">{stats.daily}</div>
-                                        <p className="text-xs text-muted-foreground">Daily Clients</p>
-                                        <div className="text-2xl font-bold mt-2">{stats.monthly}</div>
-                                        <p className="text-xs text-muted-foreground">Monthly Clients</p>
-                                    </CardContent>
-                                </Card>
-                            )) : <p className="text-muted-foreground text-sm col-span-full">No agent activity yet. Register agents and add clients to see performance.</p>}
-                        </div>
+                        {user?.role !== 'Agent' && (
+                            <>
+                            <h2 className="text-xl font-semibold my-4 flex items-center"><UserCheckIcon className="mr-2 h-5 w-5" /> Agent Performance</h2>
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                                {Object.keys(agentStats).length > 0 ? Object.entries(agentStats).map(([agent, stats]) => (
+                                    <Card key={agent}>
+                                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                            <CardTitle className="text-sm font-medium">{agent}</CardTitle>
+                                            <UserCheckIcon className="h-4 w-4 text-muted-foreground" />
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="text-2xl font-bold">{stats.daily}</div>
+                                            <p className="text-xs text-muted-foreground">Daily Clients</p>
+                                            <div className="text-2xl font-bold mt-2">{stats.monthly}</div>
+                                            <p className="text-xs text-muted-foreground">Monthly Clients</p>
+                                        </CardContent>
+                                    </Card>
+                                )) : <p className="text-muted-foreground text-sm col-span-full">No agent activity yet. Register agents and add clients to see performance.</p>}
+                            </div>
+                            </>
+                        )}
                     </div>
 
                     <div>
@@ -299,7 +316,7 @@ function DailyAddedPage() {
                     
                     <div>
                         <h2 className="text-xl font-semibold mb-4">All Added Clients</h2>
-                        {dailyAddedClients.length > 0 ? (
+                        {visibleClients.length > 0 ? (
                             <div className="rounded-lg border bg-card">
                             <Table>
                                 <TableHeader>
@@ -313,7 +330,7 @@ function DailyAddedPage() {
                                 </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                {dailyAddedClients.map((client) => (
+                                {visibleClients.map((client) => (
                                     <TableRow key={client.id}>
                                     <TableCell>{client.name}</TableCell>
                                     <TableCell>{client.age}</TableCell>
@@ -333,7 +350,7 @@ function DailyAddedPage() {
                                 No Clients Added Yet
                                 </h2>
                                 <p className="text-muted-foreground mt-2">
-                                Clients added from the parsing area will appear here.
+                                {user?.role === 'Agent' ? 'Clients you add will appear here.' : 'Clients added from the parsing area will appear here.'}
                                 </p>
                             </div>
                             </div>
@@ -365,5 +382,3 @@ function DailyAddedPage() {
 }
 
 export default withAuth(DailyAddedPage, ['Agent', 'Admin', 'Superadmin']);
-
-    
