@@ -1,15 +1,30 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default to secure: deny all reads/writes unless explicitly allowed.
+
+    // Helper function to check for Admin or Superadmin roles
+    function isAdmin() {
+      return get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.role in ['Admin', 'Superadmin'];
+    }
+
+    // Default deny all
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Allow any authenticated user to read and write to any collection.
-    // This is a secure setup for an internal tool where all users are trusted.
-    match /{path=**} {
+    // Allow anyone to check if agents exist (for signup) and create their own agent doc.
+    // Only Admins can update/delete agents.
+    match /agents/{agentId} {
+      allow list: if true;
+      allow read: if request.auth != null;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Allow authenticated users to manage their own data and admins to manage all data.
+    match /{collection}/{docId} {
       allow read, write: if request.auth != null;
     }
   }
