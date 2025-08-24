@@ -1,101 +1,16 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user has a specific role
-    function isRole(role) {
-      return get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.role == role;
-    }
-
-    function isOneOfRoles(roles) {
-      let userRole = get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.role;
-      return userRole in roles;
-    }
-
-    // Helper function to check if the user is an Admin or Superadmin
-    function isAdminOrSuperadmin() {
-      return isOneOfRoles(['Admin', 'Superadmin']);
-    }
-    
-    // Helper function to check if the user is the assigned agent for a document
-    function isAssignedAgent(doc) {
-      return request.auth.uid == get(/databases/$(database)/documents/agents/$(doc.agent)).data.uid;
-    }
-
-    // Default deny all
+    // Default to secure: deny all reads/writes unless explicitly allowed.
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Agents collection
-    match /agents/{userId} {
-      // Any authenticated user can read the list of agents (for dropdowns etc)
-      allow list: if request.auth != null;
-      // Users can read their own agent profile. Admins/Superadmins can read any profile.
-      allow get: if request.auth.uid == userId || isAdminOrSuperadmin();
-      // Only Admins/Superadmins can create, update, or delete agents
-      allow create, update, delete: if isAdminOrSuperadmin();
-    }
-
-    // Clients collection
-    match /clients/{clientId} {
-      // Agents can read/write their own clients. Admins/Superadmins can read/write any.
-      allow read, write: if isAdminOrSuperadmin() || (request.auth != null && resource.data.agent == get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.name);
-    }
-    
-    // Daily Added Clients collection
-    match /dailyAddedClients/{dailyClientId} {
-        // Any authenticated user can create.
-        allow create: if request.auth != null;
-        // Only assigned agent or admin/superadmin can read.
-        allow read: if isAdminOrSuperadmin() || (request.auth != null && resource.data.assignedAgent == get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.name);
-        // Only admin/superadmin can delete all.
-        allow delete: if isAdminOrSuperadmin();
-    }
-
-    // Deposits and Withdrawals
-    match /{transactionType}/{transactionId} where transactionType in ['deposits', 'withdrawals'] {
-      // Agents can read/write their own transactions. Admins/Superadmins can read/write any.
-      allow read, write: if isAdminOrSuperadmin() || (request.auth != null && resource.data.agent == get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.name);
-    }
-    
-    // Inventory collection
-    match /inventory/{deviceId} {
-      // Admins and Superadmins can read and write all inventory.
-      // Agents can only read inventory assigned to them.
-      allow read, write: if isAdminOrSuperadmin();
-      allow read: if request.auth != null && resource.data.agent == get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.name;
-    }
-
-    // Orders collection
-    match /orders/{orderId} {
-        // Any authenticated user can create. Admins/Superadmins can update/read all.
-        allow create: if request.auth != null;
-        allow read, update: if isAdminOrSuperadmin();
-        // Agents can read their own orders.
-        allow read: if request.auth != null && resource.data.agent == get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.name;
-    }
-    
-    // Absences, Penalties, Rewards
-    match /{disciplineType}/{recordId} where disciplineType in ['absences', 'penalties', 'rewards'] {
-        // Admins/Superadmins can create/read all.
-        allow create, read: if isAdminOrSuperadmin();
-        // Agents can read their own records.
-        allow read: if request.auth != null && resource.data.agent == get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.name;
-    }
-    
-    // Team Performance
-    match /teamPerformance/{agentName} {
-        // Only Admins/Superadmins can read/write team performance data.
-        allow read, write: if isAdminOrSuperadmin();
-    }
-    
-    // Single Docs (for Video Call Template)
-    match /singleDocs/{docId} {
-        // Any authenticated user can read/write
-        allow read, write: if request.auth != null;
+    // Allow any authenticated user to read and write to any collection.
+    // This is a secure setup for an internal tool where all users are trusted.
+    match /{path=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
