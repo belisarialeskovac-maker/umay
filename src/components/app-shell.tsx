@@ -18,8 +18,7 @@ import {
 } from '@/components/ui/sidebar';
 import {
   AreaChart,
-  ArrowDownToLine,
-  ArrowUpFromLine,
+  ArrowRightLeft,
   Boxes,
   CalendarPlus,
   ClipboardList,
@@ -42,8 +41,7 @@ const navItems = [
   { href: '/videocall-template', icon: Video, label: 'Videocall Template', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/client-details', icon: Users, label: 'Client Details', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/order-request', icon: ClipboardList, label: 'Order Request', roles: ['Agent', 'Admin', 'Superadmin'] },
-  { href: '/deposit', icon: ArrowDownToLine, label: 'Deposit', roles: ['Agent', 'Admin', 'Superadmin'] },
-  { href: '/withdrawal', icon: ArrowUpFromLine, label: 'Withdrawal', roles: ['Agent', 'Admin', 'Superadmin'] },
+  { href: '/transactions', icon: ArrowRightLeft, label: 'Transactions', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/team-performance', icon: AreaChart, label: 'Team Performance', roles: ['Admin', 'Superadmin'] },
   { href: '/agent-performance', icon: UserCheck, label: 'Agent Management', roles: ['Admin', 'Superadmin'] },
   { href: '/reporting', icon: FileText, label: 'Reporting', roles: ['Admin', 'Superadmin'] },
@@ -144,3 +142,5 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   )
 }
+
+    
