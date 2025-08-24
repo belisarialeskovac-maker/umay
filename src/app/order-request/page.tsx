@@ -84,6 +84,8 @@ function OrderRequestPage() {
   })
 
   const watchedAgent = form.watch("agent");
+  const displayAgents = useMemo(() => agents.filter(agent => agent.role !== 'Superadmin'), [agents]);
+
 
   const agentClients = useMemo(() => {
     if (!watchedAgent) return [];
@@ -236,7 +238,7 @@ function OrderRequestPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {agents.map((agent) => (
+                          {displayAgents.map((agent) => (
                             <SelectItem key={agent.id} value={agent.name}>
                               {agent.name}
                             </SelectItem>

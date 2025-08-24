@@ -63,6 +63,8 @@ export default function AddDeviceForm({ onSubmit, agentNames }: AddDeviceFormPro
   }
 
   const isAgent = user?.role === 'Agent';
+  const displayAgents = agentNames.filter(name => name !== 'Superadmin');
+
 
   return (
     <Form {...form}>
@@ -82,7 +84,7 @@ export default function AddDeviceForm({ onSubmit, agentNames }: AddDeviceFormPro
                         </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                        {agentNames.map((name) => (
+                        {displayAgents.map((name) => (
                         <SelectItem key={name} value={name}>
                             {name}
                         </SelectItem>

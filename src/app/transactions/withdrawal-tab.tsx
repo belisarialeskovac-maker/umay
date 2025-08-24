@@ -117,6 +117,8 @@ export default function WithdrawalTab() {
   const editForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema)
   });
+
+  const displayAgents = useMemo(() => agents.filter(agent => agent.role !== 'Superadmin'), [agents]);
   
   const filteredWithdrawals = useMemo(() => {
     return withdrawals.filter(withdrawal => {
@@ -422,7 +424,7 @@ export default function WithdrawalTab() {
             <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by agent" /></SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">All Agents</SelectItem>
-                {agents.map(agent => (<SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>))}
+                {displayAgents.map(agent => (<SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>))}
             </SelectContent>
         </Select>
         <Select value={monthFilter} onValueChange={setMonthFilter}>

@@ -126,6 +126,8 @@ function ClientDetailsPage() {
   const editForm = useForm<ClientFormData>({
     resolver: zodResolver(formSchema)
   });
+
+  const displayAgents = useMemo(() => agents.filter(agent => agent.role !== 'Superadmin'), [agents]);
   
   const filteredClients = useMemo(() => {
     return clients.filter(client => {
@@ -325,7 +327,7 @@ function ClientDetailsPage() {
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                         <SelectContent>
-                        {agents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
+                        {displayAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
                         </SelectContent>
                     </Select>
                     <FormMessage />
@@ -372,7 +374,7 @@ function ClientDetailsPage() {
             <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by agent" /></SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">All Agents</SelectItem>
-                {agents.map(agent => (<SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>))}
+                {displayAgents.map(agent => (<SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>))}
             </SelectContent>
         </Select>
         <Select value={monthFilter} onValueChange={setMonthFilter}>
@@ -486,7 +488,7 @@ function ClientDetailsPage() {
                         <FormLabel>Agent</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
-                            <SelectContent>{agents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}</SelectContent>
+                            <SelectContent>{displayAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}</SelectContent>
                         </Select>
                         <FormMessage />
                         </FormItem>

@@ -138,6 +138,8 @@ function AgentPerformancePage() {
     resolver: zodResolver(formSchema),
   });
 
+  const displayAgents = agents.filter(agent => agent.role !== 'Superadmin');
+
   useEffect(() => {
     if (selectedAgent) {
         setAgentClients(clients.filter(c => c.agent === selectedAgent.name));
@@ -586,7 +588,7 @@ function AgentPerformancePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {agents.map((agent) => (
+              {displayAgents.map((agent) => (
                 <TableRow key={agent.id}>
                   <TableCell onClick={() => handleRowClick(agent)} className="cursor-pointer font-medium">{agent.name}</TableCell>
                   <TableCell onClick={() => handleRowClick(agent)} className="cursor-pointer">{agent.email}</TableCell>

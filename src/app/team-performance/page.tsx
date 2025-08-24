@@ -110,10 +110,12 @@ function TeamPerformancePage() {
   const penaltyForm = useForm<z.infer<typeof penaltySchema>>({ resolver: zodResolver(penaltySchema), defaultValues: { date: new Date(), amount: 0 } })
   const rewardForm = useForm<z.infer<typeof rewardSchema>>({ resolver: zodResolver(rewardSchema), defaultValues: { date: new Date(), status: "Unclaimed"} })
 
+  const displayAgents = useMemo(() => agents.filter(agent => agent.role !== 'Superadmin'), [agents]);
+
 
   useEffect(() => {
     const calculatePerformanceMetrics = () => {
-        const performanceData = agents.map(agent => {
+        const performanceData = displayAgents.map(agent => {
             const systemMetrics = {
                 addedToday: dailyAddedClients.filter(c => c.assignedAgent === agent.name && isToday(c.date)).length,
                 monthlyAdded: dailyAddedClients.filter(c => c.assignedAgent === agent.name && isThisMonth(c.date)).length,
@@ -142,7 +144,7 @@ function TeamPerformancePage() {
     if (!dataLoading) {
       calculatePerformanceMetrics();
     }
-  }, [agents, teamPerformanceDocs, dailyAddedClients, clients, deposits, withdrawals, dataLoading]);
+  }, [displayAgents, teamPerformanceDocs, dailyAddedClients, clients, deposits, withdrawals, dataLoading]);
 
   const onAbsenceSubmit = async (values: z.infer<typeof absenceSchema>) => {
     await addDoc(collection(db, "absences"), values);
@@ -312,7 +314,7 @@ function TeamPerformancePage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {agents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
+                            {displayAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -402,7 +404,7 @@ function TeamPerformancePage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {agents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
+                            {displayAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -503,7 +505,7 @@ function TeamPerformancePage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {agents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
+                            {displayAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormMessage />
