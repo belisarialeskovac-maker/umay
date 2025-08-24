@@ -85,8 +85,10 @@ export default function SignupPage() {
       const q = query(agentsRef, limit(1));
       const snapshot = await getDocs(q);
       
-      const role: 'Superadmin' | 'Agent' = snapshot.empty ? 'Superadmin' : 'Agent';
-      
+      const isFirstUser = snapshot.empty;
+      const role = isFirstUser ? 'Superadmin' : 'Agent';
+      const status = isFirstUser ? 'Active' : 'Pending';
+
       // 3. Create the agent document in Firestore
       const agentData = {
         uid: user.uid,
@@ -94,6 +96,7 @@ export default function SignupPage() {
         email: values.email,
         agentType: values.agentType,
         role: role,
+        status: status,
         dateHired: new Date(),
       };
 
@@ -101,10 +104,12 @@ export default function SignupPage() {
       
       toast({
         title: "Account Created Successfully!",
-        description: `Your account has been created with the role: ${role}. You will now be logged in.`,
+        description: isFirstUser 
+            ? `Your account has been created with the role: ${role}. You will now be logged in.`
+            : `Your account has been created and is awaiting admin approval.`,
       })
       
-      // The onAuthStateChanged listener in AuthProvider will handle the redirect
+      // The onAuthStateChanged listener in AuthProvider will handle the redirect or logout
 
     } catch (error: any) {
       console.error("Signup failed:", error)
@@ -224,5 +229,3 @@ export default function SignupPage() {
     </div>
   )
 }
-
-    

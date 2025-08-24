@@ -6,6 +6,8 @@ import { getAuth, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { app, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { toast } from '@/hooks/use-toast';
+
 
 export interface UserProfile {
   uid: string;
@@ -14,6 +16,7 @@ export interface UserProfile {
   role: 'Agent' | 'Admin' | 'Superadmin';
   agentType: string;
   dateHired: Date;
+  status: 'Active' | 'Pending' | 'Rejected';
 }
 
 interface AuthContextType {
@@ -39,19 +42,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const agentSnap = await getDoc(agentRef);
           if (agentSnap.exists()) {
             const agentData = agentSnap.data();
-            setUser({
-              uid: firebaseUser.uid,
-              email: agentData.email,
-              name: agentData.name,
-              role: agentData.role,
-              agentType: agentData.agentType,
-              dateHired: (agentData.dateHired as Timestamp).toDate(),
-            });
+
+            if (agentData.status === 'Pending') {
+                toast({
+                    title: "Account Pending Approval",
+                    description: "Your account is waiting for an admin to approve it.",
+                    variant: "destructive"
+                });
+                await signOut(auth);
+                setUser(null);
+            } else if (agentData.status === 'Rejected') {
+                 toast({
+                    title: "Account Rejected",
+                    description: "Your account has been rejected. Please contact an administrator.",
+                    variant: "destructive"
+                });
+                await signOut(auth);
+                setUser(null);
+            } else {
+                setUser({
+                    uid: firebaseUser.uid,
+                    email: agentData.email,
+                    name: agentData.name,
+                    role: agentData.role,
+                    agentType: agentData.agentType,
+                    status: agentData.status,
+                    dateHired: (agentData.dateHired as Timestamp).toDate(),
+                });
+            }
           } else {
-            // This case might happen if the Firestore doc creation fails after auth creation
-            // Or if a user is created in Auth console but not in Firestore
             console.warn(`No profile found in Firestore for user ${firebaseUser.uid}`);
-            await signOut(auth); // Log out the user as they are in an inconsistent state
+            await signOut(auth);
             setUser(null);
           }
         } catch (error) {

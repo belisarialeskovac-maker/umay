@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
-import { CalendarIcon, X, MoreHorizontal, Edit, Trash2, Loader2 } from "lucide-react"
+import { CalendarIcon, X, MoreHorizontal, Edit, Trash2, Loader2, Check, Ban } from "lucide-react"
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth"
 
 import { cn } from "@/lib/utils"
@@ -77,6 +77,8 @@ import type { Agent, Client, Transaction, Inventory, Order, Absence, Penalty, Re
 
 const agentTypes = ["Regular", "Elite", "Spammer", "Model", "Team Leader"] as const
 const roles = ["Agent", "Admin", "Superadmin"] as const;
+const agentStatus = ["Active", "Pending", "Rejected"] as const;
+
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -92,6 +94,7 @@ const formSchema = z.object({
   confirmPassword: z.string().min(6, "Password must be at least 6 characters.").optional(),
   agentType: z.enum(agentTypes),
   role: z.enum(roles).default("Agent"),
+  status: z.enum(agentStatus).default("Active"),
 }).refine(data => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
@@ -160,10 +163,6 @@ function AgentPerformancePage() {
         return;
     }
     try {
-      // NOTE: This creates a new user in Firebase Auth.
-      // This is a simplified approach. In a real-world scenario, you would want to use a more secure method
-      // like a Cloud Function to handle user creation, especially when creating users from an admin panel.
-      // However, for the purpose of this prototype, creating the user on the client-side is acceptable.
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const { uid } = userCredential.user;
 
@@ -177,6 +176,7 @@ function AgentPerformancePage() {
         email: values.email,
         agentType: values.agentType,
         role: values.role,
+        status: values.status,
         dateHired: values.dateHired,
       };
 
@@ -203,7 +203,7 @@ function AgentPerformancePage() {
     try {
       const agentRef = doc(db, "agents", agentToEdit.uid);
       const { password, confirmPassword, ...agentData } = values;
-      await updateDoc(agentRef, agentData as any); // Type assertion needed because updateDoc doesn't know about our refined schema
+      await updateDoc(agentRef, agentData as any);
       toast({ title: "Agent Updated", description: "Agent details have been updated." });
       setEditOpen(false);
       editForm.reset();
@@ -211,6 +211,20 @@ function AgentPerformancePage() {
         toast({ title: "Error", description: error.message || "Failed to update agent.", variant: "destructive" });
     }
   }
+  
+  const handleUpdateStatus = async (agent: Agent, newStatus: "Active" | "Rejected") => {
+    try {
+        const agentRef = doc(db, "agents", agent.uid);
+        await updateDoc(agentRef, { status: newStatus });
+        toast({
+            title: `Agent ${newStatus}`,
+            description: `${agent.name}'s account has been ${newStatus.toLowerCase()}.`
+        })
+    } catch (error: any) {
+         toast({ title: "Error", description: error.message || "Failed to update agent status.", variant: "destructive" });
+    }
+  }
+
 
   const handleDeleteAgent = async () => {
     if (!agentToDelete) return;
@@ -244,6 +258,14 @@ function AgentPerformancePage() {
   }
   
   const handleRowClick = (agent: Agent) => {
+    if(agent.status !== 'Active') {
+        toast({
+            title: "Account Not Active",
+            description: "Detailed view is only available for active agents.",
+            variant: "destructive"
+        })
+        return;
+    }
     setSelectedAgent(agent);
   }
 
@@ -267,7 +289,7 @@ function AgentPerformancePage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Agent Management</h1>
           <p className="text-muted-foreground mt-1">
-            Monitor and manage your agents. Click on an agent to view their details.
+            Monitor and manage your agents. Click on an active agent to view their details.
           </p>
         </div>
         {canRegisterAgent && (
@@ -584,6 +606,7 @@ function AgentPerformancePage() {
                 <TableHead>Date Hired</TableHead>
                 <TableHead>Agent Type</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -595,6 +618,9 @@ function AgentPerformancePage() {
                   <TableCell onClick={() => handleRowClick(agent)} className="cursor-pointer">{format(agent.dateHired, "PPP")}</TableCell>
                   <TableCell onClick={() => handleRowClick(agent)} className="cursor-pointer">{agent.agentType}</TableCell>
                    <TableCell onClick={() => handleRowClick(agent)} className="cursor-pointer"><Badge variant={agent.role === 'Superadmin' ? 'destructive' : agent.role === 'Admin' ? 'default' : 'secondary'}>{agent.role}</Badge></TableCell>
+                   <TableCell onClick={() => handleRowClick(agent)} className="cursor-pointer">
+                        <Badge variant={agent.status === 'Active' ? 'default' : agent.status === 'Pending' ? 'secondary' : 'destructive'}>{agent.status}</Badge>
+                   </TableCell>
                    <TableCell>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -602,6 +628,13 @@ function AgentPerformancePage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                {agent.status === 'Pending' && (
+                                    <>
+                                    <DropdownMenuItem onClick={() => handleUpdateStatus(agent, 'Active')}><Check className="mr-2 h-4 w-4" /> Approve</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleUpdateStatus(agent, 'Rejected')} className="text-red-600"><Ban className="mr-2 h-4 w-4" /> Reject</DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    </>
+                                )}
                                 <DropdownMenuItem onClick={() => openEditDialog(agent)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => openDeleteDialog(agent)} className="text-red-600"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
@@ -654,6 +687,12 @@ function AgentPerformancePage() {
                         <SelectContent>{roles.map(r=><SelectItem key={r} value={r} disabled={user?.role !== 'Superadmin' && r === 'Superadmin'}>{r}</SelectItem>)}</SelectContent>
                         </Select><FormMessage /></FormItem>
                      )} />
+                     <FormField control={editForm.control} name="status" render={({ field }) => (
+                        <FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>{agentStatus.map(s=><SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                        </Select><FormMessage /></FormItem>
+                     )} />
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
                         <Button type="submit">Save Changes</Button>
@@ -684,5 +723,3 @@ function AgentPerformancePage() {
 
 
 export default withAuth(AgentPerformancePage, ['Admin', 'Superadmin']);
-
-    

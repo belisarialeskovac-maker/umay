@@ -16,6 +16,7 @@ export type Agent = {
   dateHired: Date;
   agentType: string;
   role: 'Agent' | 'Admin' | 'Superadmin';
+  status: 'Active' | 'Pending' | 'Rejected';
 };
 
 export type Client = {
@@ -268,5 +269,3 @@ export const useData = (): DataContextType => {
   }
   return context;
 };
-
-    
