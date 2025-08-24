@@ -38,7 +38,6 @@ import { useAuth } from '@/context/auth-context';
 const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/profile', icon: UserIcon, label: 'Profile', roles: ['Agent', 'Admin', 'Superadmin'] },
-  { href: '/videocall-template', icon: Video, label: 'Videocall Template', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/client-details', icon: Users, label: 'Client Details', roles: ['Agent', 'Admin', 'Superadmin'] },
   { href: '/order-request', icon: ClipboardList, label: 'Order Request', roles: ['Admin', 'Superadmin'] },
   { href: '/transactions', icon: ArrowRightLeft, label: 'Transactions', roles: ['Agent', 'Admin', 'Superadmin'] },
