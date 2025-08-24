@@ -58,6 +58,7 @@ export type Inventory = {
     color: string;
     appleIdUsername?: string;
     appleIdPassword?: string;
+
     remarks?: string;
     createdAt: string;
     updatedAt: string;
@@ -128,32 +129,6 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 
-// --- Helper Function ---
-
-function createCollectionListener<T>(collectionName: string, setData: (data: T[]) => void, setLoading: (loading: boolean) => void) {
-  const q = query(collection(db, collectionName));
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const dataList: T[] = [];
-    snapshot.forEach((doc) => {
-      const docData = doc.data();
-      const item: any = { id: doc.id, ...docData };
-      // Convert Timestamps to Dates for any field
-      for (const key in item) {
-        if (item[key] instanceof Timestamp) {
-          item[key] = item[key].toDate();
-        }
-      }
-      dataList.push(item as T);
-    });
-    setData(dataList);
-    setLoading(false);
-  }, (error) => {
-    console.error(`Error fetching ${collectionName}:`, error);
-    setLoading(false);
-  });
-  return unsubscribe;
-}
-
 // --- Provider Component ---
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
@@ -173,7 +148,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading) {
+        setLoading(true);
+        return;
+    };
     if (!user) {
         // If no user, clear data and stop loading
         setAgents([]);
@@ -193,21 +171,58 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     
     setLoading(true);
     
-    const collections = {
-        agents: setAgents,
-        clients: setClients,
-        dailyAddedClients: setDailyAddedClients,
-        deposits: setDeposits,
-        withdrawals: setWithdrawals,
-        inventory: setInventory,
-        orders: setOrders,
-        absences: setAbsences,
-        penalties: setPenalties,
-        rewards: setRewards,
-    };
+    const collectionsToFetch = [
+        { name: 'agents', setter: setAgents },
+        { name: 'clients', setter: setClients },
+        { name: 'dailyAddedClients', setter: setDailyAddedClients },
+        { name: 'deposits', setter: setDeposits },
+        { name: 'withdrawals', setter: setWithdrawals },
+        { name: 'inventory', setter: setInventory },
+        { name: 'orders', setter: setOrders },
+        { name: 'absences', setter: setAbsences },
+        { name: 'penalties', setter: setPenalties },
+        { name: 'rewards', setter: setRewards },
+    ];
+    let loadedCount = 0;
 
-    const unsubscribers = Object.entries(collections).map(([name, setter]) => 
-        createCollectionListener(name, setter as any, () => {})
+    const createCollectionListener = (collectionName: string, setData: (data: any[]) => void) => {
+        const q = query(collection(db, collectionName));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const dataList: any[] = [];
+            snapshot.forEach((doc) => {
+                const docData = doc.data();
+                const item: any = { id: doc.id, ...docData };
+                for (const key in item) {
+                    if (item[key] instanceof Timestamp) {
+                        item[key] = item[key].toDate();
+                    }
+                }
+                dataList.push(item);
+            });
+            setData(dataList);
+
+            // This logic ensures we only set loading to false after the initial fetch of all collections
+            if(loadedCount < collectionsToFetch.length + 1) { // +1 for teamPerformance
+                loadedCount++;
+                if (loadedCount === collectionsToFetch.length + 1) {
+                    setLoading(false);
+                }
+            }
+
+        }, (error) => {
+            console.error(`Error fetching ${collectionName}:`, error);
+            if(loadedCount < collectionsToFetch.length + 1) {
+                loadedCount++;
+                if (loadedCount === collectionsToFetch.length + 1) {
+                    setLoading(false);
+                }
+            }
+        });
+        return unsubscribe;
+    }
+
+    const unsubscribers = collectionsToFetch.map(({ name, setter }) => 
+        createCollectionListener(name, setter)
     );
 
     const perfUnsub = onSnapshot(collection(db, 'teamPerformance'), (snapshot) => {
@@ -216,11 +231,23 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             perfDocs[doc.id] = doc.data() as TeamPerformanceData;
         });
         setTeamPerformance(perfDocs);
+
+        if(loadedCount < collectionsToFetch.length + 1) {
+            loadedCount++;
+            if (loadedCount === collectionsToFetch.length + 1) {
+                setLoading(false);
+            }
+        }
+    }, (error) => {
+        console.error(`Error fetching teamPerformance:`, error);
+        if(loadedCount < collectionsToFetch.length + 1) {
+            loadedCount++;
+            if (loadedCount === collectionsToFetch.length + 1) {
+                setLoading(false);
+            }
+        }
     });
     unsubscribers.push(perfUnsub);
-    
-    const anyLoading = Object.values(collections).length > 0;
-    setLoading(anyLoading);
     
     return () => unsubscribers.forEach(unsub => unsub());
 
@@ -238,7 +265,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     penalties,
     rewards,
     teamPerformance,
-    loading,
+    loading: authLoading || loading,
   };
 
   return (
