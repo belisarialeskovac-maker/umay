@@ -73,6 +73,8 @@ const orderFormSchema = z.object({
   remarks: z.string(),
 })
 
+const ITEMS_PER_PAGE = 10;
+
 function ProfilePage() {
   const { user, loading: authLoading } = useAuth();
   const { 
@@ -108,6 +110,16 @@ function ProfilePage() {
       remarks: "",
     },
   })
+
+  // Pagination states
+  const [clientsPage, setClientsPage] = useState(1);
+  const [depositsPage, setDepositsPage] = useState(1);
+  const [withdrawalsPage, setWithdrawalsPage] = useState(1);
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [absencesPage, setAbsencesPage] = useState(1);
+  const [penaltiesPage, setPenaltiesPage] = useState(1);
+  const [rewardsPage, setRewardsPage] = useState(1);
 
   async function onOrderSubmit(values: z.infer<typeof orderFormSchema>) {
     if(!user) return;
@@ -147,6 +159,66 @@ function ProfilePage() {
         setAgentRewards(filterByName(rewards));
     }
   }, [user, clients, deposits, withdrawals, inventory, orders, absences, penalties, rewards, dataLoading]);
+  
+  const paginate = (items: any[], page: number) => {
+    const startIndex = (page - 1) * ITEMS_PER_PAGE;
+    return items.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  };
+  
+  const renderPaginationControls = (
+    totalPages: number,
+    currentPage: number,
+    setCurrentPage: (page: number) => void
+  ) => {
+    if (totalPages <= 1) return null;
+    return (
+        <div className="flex items-center justify-end space-x-2 py-4">
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+            >
+                Previous
+            </Button>
+             <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+            </span>
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+            >
+                Next
+            </Button>
+        </div>
+    );
+  };
+  
+  const paginatedClients = paginate(agentClients, clientsPage);
+  const clientsTotalPages = Math.ceil(agentClients.length / ITEMS_PER_PAGE);
+  
+  const paginatedDeposits = paginate(agentDeposits, depositsPage);
+  const depositsTotalPages = Math.ceil(agentDeposits.length / ITEMS_PER_PAGE);
+  
+  const paginatedWithdrawals = paginate(agentWithdrawals, withdrawalsPage);
+  const withdrawalsTotalPages = Math.ceil(agentWithdrawals.length / ITEMS_PER_PAGE);
+  
+  const paginatedInventory = paginate(agentInventory, inventoryPage);
+  const inventoryTotalPages = Math.ceil(agentInventory.length / ITEMS_PER_PAGE);
+  
+  const paginatedOrders = paginate(agentOrders, ordersPage);
+  const ordersTotalPages = Math.ceil(agentOrders.length / ITEMS_PER_PAGE);
+  
+  const paginatedAbsences = paginate(agentAbsences, absencesPage);
+  const absencesTotalPages = Math.ceil(agentAbsences.length / ITEMS_PER_PAGE);
+
+  const paginatedPenalties = paginate(agentPenalties, penaltiesPage);
+  const penaltiesTotalPages = Math.ceil(agentPenalties.length / ITEMS_PER_PAGE);
+
+  const paginatedRewards = paginate(agentRewards, rewardsPage);
+  const rewardsTotalPages = Math.ceil(agentRewards.length / ITEMS_PER_PAGE);
 
 
   if (authLoading || dataLoading || !user) {
@@ -370,11 +442,12 @@ function ProfilePage() {
                             <Table>
                                 <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client Name</TableHead><TableHead>KYC Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                                 <TableBody>
-                                    {agentClients.length > 0 ? agentClients.map(c => (
+                                    {paginatedClients.length > 0 ? paginatedClients.map(c => (
                                         <TableRow key={c.id}><TableCell>{c.shopId}</TableCell><TableCell>{c.clientName}</TableCell><TableCell>{format(c.kycCompletedDate, "PPP")}</TableCell><TableCell><Badge variant={c.status === 'Active' ? 'default' : c.status === 'In Process' ? 'secondary' : 'destructive'}>{c.status}</Badge></TableCell></TableRow>
                                     )) : <TableRow><TableCell colSpan={4} className="text-center">No clients found.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
+                             {renderPaginationControls(clientsTotalPages, clientsPage, setClientsPage)}
                         </TabsContent>
                         <TabsContent value="transactions" className="pt-4">
                             <div className="grid gap-6 md:grid-cols-2">
@@ -383,22 +456,24 @@ function ProfilePage() {
                                     <Table>
                                         <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                                         <TableBody>
-                                            {agentDeposits.length > 0 ? agentDeposits.map((d,i) => (
+                                            {paginatedDeposits.length > 0 ? paginatedDeposits.map((d,i) => (
                                                 <TableRow key={d.id}><TableCell>{d.shopId}</TableCell><TableCell>{d.clientName}</TableCell><TableCell>{format(d.date, "PPP")}</TableCell><TableCell className="text-right">${d.amount.toFixed(2)}</TableCell></TableRow>
                                             )) : <TableRow><TableCell colSpan={4} className="text-center">No deposits found.</TableCell></TableRow>}
                                         </TableBody>
                                     </Table>
+                                    {renderPaginationControls(depositsTotalPages, depositsPage, setDepositsPage)}
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-medium mb-2 flex items-center"><Activity className="mr-2 h-5 w-5"/>Withdrawals</h3>
                                     <Table>
                                         <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                                         <TableBody>
-                                            {agentWithdrawals.length > 0 ? agentWithdrawals.map((w,i) => (
+                                            {paginatedWithdrawals.length > 0 ? paginatedWithdrawals.map((w,i) => (
                                                 <TableRow key={w.id}><TableCell>{w.shopId}</TableCell><TableCell>{w.clientName}</TableCell><TableCell>{format(w.date, "PPP")}</TableCell><TableCell className="text-right">${w.amount.toFixed(2)}</TableCell></TableRow>
                                             )) : <TableRow><TableCell colSpan={4} className="text-center">No withdrawals found.</TableCell></TableRow>}
                                         </TableBody>
                                     </Table>
+                                     {renderPaginationControls(withdrawalsTotalPages, withdrawalsPage, setWithdrawalsPage)}
                                 </div>
                             </div>
                         </TabsContent>
@@ -406,21 +481,23 @@ function ProfilePage() {
                             <Table>
                                 <TableHeader><TableRow><TableHead>IMEI</TableHead><TableHead>Model</TableHead><TableHead>Color</TableHead><TableHead>Last Updated</TableHead></TableRow></TableHeader>
                                 <TableBody>
-                                    {agentInventory.length > 0 ? agentInventory.map(d => (
+                                    {paginatedInventory.length > 0 ? paginatedInventory.map(d => (
                                         <TableRow key={d.id}><TableCell>{d.imei}</TableCell><TableCell>{d.model}</TableCell><TableCell>{d.color}</TableCell><TableCell>{format(new Date(d.updatedAt), "PPP p")}</TableCell></TableRow>
                                     )) : <TableRow><TableCell colSpan={4} className="text-center">No devices assigned to you.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
+                             {renderPaginationControls(inventoryTotalPages, inventoryPage, setInventoryPage)}
                         </TabsContent>
                         <TabsContent value="orders" className="pt-4">
                             <Table>
                                 <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Location</TableHead><TableHead className="text-right">Price</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                                 <TableBody>
-                                    {agentOrders.length > 0 ? agentOrders.map(o => (
+                                    {paginatedOrders.length > 0 ? paginatedOrders.map(o => (
                                         <TableRow key={o.id}><TableCell>{o.shopId}</TableCell><TableCell>{o.location}</TableCell><TableCell className="text-right">${o.price.toFixed(2)}</TableCell><TableCell><Badge variant={o.status === 'Approved' ? 'default' : o.status === 'Pending' ? 'secondary' : 'destructive'}>{o.status}</Badge></TableCell></TableRow>
                                     )) : <TableRow><TableCell colSpan={4} className="text-center">No orders found.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
+                            {renderPaginationControls(ordersTotalPages, ordersPage, setOrdersPage)}
                         </TabsContent>
                         <TabsContent value="discipline" className="pt-4">
                             <div className="grid gap-6 md:grid-cols-2">
@@ -429,22 +506,24 @@ function ProfilePage() {
                                     <Table>
                                         <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Remarks</TableHead></TableRow></TableHeader>
                                         <TableBody>
-                                            {agentAbsences.length > 0 ? agentAbsences.map((a,i) => (
+                                            {paginatedAbsences.length > 0 ? paginatedAbsences.map((a,i) => (
                                                 <TableRow key={a.id}><TableCell>{format(a.date, "PPP")}</TableCell><TableCell>{a.remarks}</TableCell></TableRow>
                                             )) : <TableRow><TableCell colSpan={2} className="text-center">No absences found.</TableCell></TableRow>}
                                         </TableBody>
                                     </Table>
+                                    {renderPaginationControls(absencesTotalPages, absencesPage, setAbsencesPage)}
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-medium mb-2 flex items-center"><ShieldAlert className="mr-2 h-5 w-5"/>Penalties</h3>
                                     <Table>
                                         <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Remarks</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                                         <TableBody>
-                                            {agentPenalties.length > 0 ? agentPenalties.map((p,i) => (
+                                            {paginatedPenalties.length > 0 ? paginatedPenalties.map((p,i) => (
                                                 <TableRow key={p.id}><TableCell>{format(p.date, "PPP")}</TableCell><TableCell>{p.remarks}</TableCell><TableCell className="text-right">${p.amount.toFixed(2)}</TableCell></TableRow>
                                             )) : <TableRow><TableCell colSpan={3} className="text-center">No penalties found.</TableCell></TableRow>}
                                         </TableBody>
                                     </Table>
+                                     {renderPaginationControls(penaltiesTotalPages, penaltiesPage, setPenaltiesPage)}
                                 </div>
                             </div>
                         </TabsContent>
@@ -453,11 +532,12 @@ function ProfilePage() {
                             <Table>
                                 <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                                 <TableBody>
-                                    {agentRewards.length > 0 ? agentRewards.map((r,i) => (
+                                    {paginatedRewards.length > 0 ? paginatedRewards.map((r,i) => (
                                         <TableRow key={r.id}><TableCell>{format(r.date, "PPP")}</TableCell><TableCell>{r.remarks}</TableCell><TableCell><Badge variant={r.status === 'Claimed' ? 'secondary' : 'default'}>{r.status}</Badge></TableCell></TableRow>
                                     )) : <TableRow><TableCell colSpan={3} className="text-center">No rewards found.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
+                             {renderPaginationControls(rewardsTotalPages, rewardsPage, setRewardsPage)}
                         </TabsContent>
                     </Tabs>
                 </CardContent>
@@ -469,5 +549,3 @@ function ProfilePage() {
 }
 
 export default withAuth(ProfilePage, ['Agent', 'Admin', 'Superadmin']);
-
-    
