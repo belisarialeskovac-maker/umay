@@ -44,7 +44,7 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const auth = getAuth(app)
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, setInitialLogin } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -70,8 +70,9 @@ export default function LoginPage() {
         title: "Login Successful",
         description: "Welcome back!",
       })
+      setInitialLogin(true);
       // The onAuthStateChanged listener in AuthProvider will handle the redirect
-      // and show the loading screen via AppShell.
+      // and AppShell will show the loading screen.
     } catch (error: any) {
       console.error("Login failed:", error)
       toast({
@@ -84,9 +85,9 @@ export default function LoginPage() {
   }
   
   if (authLoading || user) {
+    // Show a minimal loader while waiting for auth state or redirect
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }

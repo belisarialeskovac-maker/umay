@@ -25,6 +25,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   isInitialLogin: boolean;
   completeInitialLogin: () => void;
+  setInitialLogin: (isInitial: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -72,11 +73,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     status: agentData.status,
                     dateHired: (agentData.dateHired as Timestamp).toDate(),
                 };
-                
-                // If there was no user before, it's an initial login
-                if (!user) {
-                    setIsInitialLogin(true);
-                }
                 setUser(newUserProfile);
             }
           } else {
@@ -108,9 +104,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const completeInitialLogin = useCallback(() => {
     setIsInitialLogin(false);
   }, []);
+  
+  const setInitialLogin = useCallback((isInitial: boolean) => {
+    setIsInitialLogin(isInitial);
+  }, []);
+
 
   return (
-    <AuthContext.Provider value={{ user, loading, logout, isInitialLogin, completeInitialLogin }}>
+    <AuthContext.Provider value={{ user, loading, logout, isInitialLogin, completeInitialLogin, setInitialLogin }}>
       {children}
     </AuthContext.Provider>
   );

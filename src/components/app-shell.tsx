@@ -70,18 +70,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return <LoadingScreen onAnimationComplete={completeInitialLogin} />;
   }
   
-  if (authLoading || dataLoading && user) {
-      return (
-          <div className="flex h-screen w-full items-center justify-center">
-              <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
-          </div>
-      )
+  if (authLoading && !user) {
+    // This covers the initial load before we know if there's a user.
+    // It's a brief, blank screen to avoid flashing the login page.
+    return <div className="h-screen w-full bg-background" />;
   }
 
   if (!user) {
     return <main className="flex-1">{children}</main>;
   }
   
+  if (dataLoading) {
+     return (
+          <div className="flex h-screen w-full items-center justify-center">
+              <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+          </div>
+      )
+  }
+
   const userInitials = user.name?.split(' ').map(n => n[0]).join('') || 'U';
 
   return (
