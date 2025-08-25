@@ -75,6 +75,8 @@ import { useAuth } from "@/context/auth-context"
 import withAuth from "@/components/with-auth"
 import type { Client } from "@/context/data-context"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useDebounce } from '@/hooks/use-debounce';
+import { useVirtualPagination } from '@/hooks/use-virtual-pagination';
 
 const clientStatus = ["In Process", "Active", "Inactive", "Eliminated"] as const;
 
@@ -114,7 +116,7 @@ function ShopDetailsPage() {
   const [isImporting, setIsImporting] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [agentFilter, setAgentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("all");
@@ -124,6 +126,7 @@ function ShopDetailsPage() {
 
   const csvInputRef = useRef<HTMLInputElement>(null);
 
+  const debouncedSearch = useDebounce(searchInput, 300);
 
   const { clients: allClients, agents, loading: dataLoading } = useData();
   const { user } = useAuth();
@@ -159,8 +162,8 @@ function ShopDetailsPage() {
     const clientsToFilter = [...userVisibleClients].sort((a, b) => b.kycCompletedDate.getTime() - a.kycCompletedDate.getTime());
     
     return clientsToFilter.filter(client => {
-        const lowercasedTerm = searchTerm.toLowerCase();
-        const matchesSearch = searchTerm.trim() === '' ||
+        const lowercasedTerm = debouncedSearch.toLowerCase();
+        const matchesSearch = debouncedSearch.trim() === '' ||
             client.shopId.toLowerCase().includes(lowercasedTerm) ||
             client.clientName.toLowerCase().includes(lowercasedTerm) ||
             client.agent.toLowerCase().includes(lowercasedTerm) ||
@@ -176,7 +179,7 @@ function ShopDetailsPage() {
 
         return matchesSearch && matchesAgent && matchesStatus && matchesMonth && matchesYear;
     });
-  }, [userVisibleClients, searchTerm, agentFilter, statusFilter, monthFilter, yearFilter]);
+  }, [userVisibleClients, debouncedSearch, agentFilter, statusFilter, monthFilter, yearFilter]);
 
   const paginatedClients = useMemo(() => {
     const startIndex = (currentPage - 1) * CLIENTS_PER_PAGE;
@@ -189,7 +192,7 @@ function ShopDetailsPage() {
   useEffect(() => {
     setCurrentPage(1); // Reset to first page on filter change
     setSelectedClients([]); // Clear selections on filter change
-  }, [searchTerm, agentFilter, statusFilter, monthFilter, yearFilter]);
+  }, [debouncedSearch, agentFilter, statusFilter, monthFilter, yearFilter]);
 
   const onSubmit = useCallback(async (values: ClientFormData) => {
     setIsSubmitting(true);
@@ -579,7 +582,7 @@ function ShopDetailsPage() {
        <div className="flex flex-col sm:flex-row gap-4 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search shops..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <Input placeholder="Search shops..." className="pl-10" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
         </div>
         {canManage && (
             <Select value={agentFilter} onValueChange={setAgentFilter}>

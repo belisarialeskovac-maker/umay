@@ -1,7 +1,7 @@
 
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { collection, onSnapshot, query, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from './auth-context';
@@ -147,6 +147,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   
   const [loading, setLoading] = useState(true);
 
+  // Memoize expensive computations
+  const memoizedAgents = useMemo(() => agents, [agents]);
+  const memoizedClients = useMemo(() => clients, [clients]);
+  const memoizedDeposits = useMemo(() => deposits, [deposits]);
+  const memoizedWithdrawals = useMemo(() => withdrawals, [withdrawals]);
+
   useEffect(() => {
     if (authLoading) {
         return; // Wait for auth to finish before doing anything
@@ -237,11 +243,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, [user, authLoading]);
 
   const value = {
-    agents,
-    clients,
+    agents: memoizedAgents,
+    clients: memoizedClients,
     dailyAddedClients,
-    deposits,
-    withdrawals,
+    deposits: memoizedDeposits,
+    withdrawals: memoizedWithdrawals,
     inventory,
     orders,
     absences,

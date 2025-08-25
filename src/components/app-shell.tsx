@@ -38,6 +38,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/auth-context';
 import { useData } from '@/context/data-context';
 import LoadingScreen from './loading-screen';
+import { memo } from 'react';
 
 const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['Agent', 'Admin', 'Superadmin'] },
@@ -52,18 +53,36 @@ const navItems = [
 
 const settingsNav = { href: '#', icon: Settings, label: 'Settings' };
 
+const NavigationItem = memo(({ 
+  item, 
+  pathname, 
+  badgeCount 
+}: { 
+  item: typeof navItems[0], 
+  pathname: string, 
+  badgeCount: number 
+}) => (
+  <SidebarMenuItem>
+    <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
+      <Link href={item.href}>
+        <item.icon />
+        <span>{item.label}</span>
+        {badgeCount > 0 && <SidebarMenuBadge>{badgeCount}</SidebarMenuBadge>}
+      </Link>
+    </SidebarMenuButton>
+  </SidebarMenuItem>
+));
+
+NavigationItem.displayName = 'NavigationItem';
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout, loading: authLoading, isInitialLogin, completeInitialLogin } = useAuth();
   const { agents, orders } = useData();
   
-  const pendingAgentsCount = agents.filter(agent => agent.status === 'Pending').length;
-  const pendingOrdersCount = orders.filter(order => order.status === 'Pending').length;
-
-  const badgeCounts = {
-    pendingAgents: pendingAgentsCount,
-    pendingOrders: pendingOrdersCount,
-  };
+  const badgeCounts = useMemo(() => ({
+    pendingAgents: agents.filter(agent => agent.status === 'Pending').length,
+    pendingOrders: orders.filter(order => order.status === 'Pending').length,
+  }), [agents, orders]);
 
   
   if (isInitialLogin) {
@@ -101,17 +120,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarMenu>
             {navItems.filter(item => item.roles.includes(user.role)).map((item) => {
               const badgeCount = item.badgeKey ? badgeCounts[item.badgeKey as keyof typeof badgeCounts] : 0;
-              return (
-              <SidebarMenuItem key={item.label}>
-                <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
-                  <Link href={item.href}>
-                    <item.icon />
-                    <span>{item.label}</span>
-                     {badgeCount > 0 && <SidebarMenuBadge>{badgeCount}</SidebarMenuBadge>}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )})}
+              return <NavigationItem key={item.label} item={item} pathname={pathname} badgeCount={badgeCount} />
+            })}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
@@ -143,7 +153,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/20">
+          <div className="scroll-optimized">
           {children}
+          </div>
         </main>
       </SidebarInset>
     </SidebarProvider>

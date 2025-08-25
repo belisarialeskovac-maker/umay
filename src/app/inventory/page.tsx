@@ -35,6 +35,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { useDebounce } from '@/hooks/use-debounce';
 
 export type AgentStats = {
   [key: string]: number
@@ -50,7 +51,7 @@ function InventoryPage() {
   const { user, loading: authLoading } = useAuth();
   const { inventory: allDevices, agents, loading: dataLoading } = useData();
   
-  const [searchTerm, setSearchTerm] = useState("")
+  const [searchInput, setSearchInput] = useState("")
   const [agentFilter, setAgentFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("inventory")
   const { toast } = useToast()
@@ -62,6 +63,7 @@ function InventoryPage() {
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [bulkDeleteAlertOpen, setBulkDeleteAlertOpen] = useState(false);
 
+  const debouncedSearch = useDebounce(searchInput, 300);
 
   const userVisibleDevices = useMemo(() => {
     if (dataLoading || !user) return [];
@@ -82,7 +84,7 @@ function InventoryPage() {
   }, [userVisibleDevices]);
 
   const filteredDevices = useMemo(() => {
-    const term = searchTerm.toLowerCase().trim();
+    const term = debouncedSearch.toLowerCase().trim();
     return userVisibleDevices.filter((device) => {
         const matchesAgent = agentFilter === 'all' || device.agent === agentFilter;
         const matchesSearch = term === "" || Object.values(device).some(value => 
@@ -90,7 +92,7 @@ function InventoryPage() {
         );
         return matchesAgent && matchesSearch;
     });
-  }, [searchTerm, userVisibleDevices, agentFilter]);
+  }, [debouncedSearch, userVisibleDevices, agentFilter]);
 
   const addDevice = useCallback(async (device: Omit<DeviceInventory, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) {
@@ -393,8 +395,8 @@ function InventoryPage() {
                 <div className="flex flex-col md:flex-row gap-4 mb-4">
                     <Input
                         placeholder="Search inventory..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
                         className="max-w-sm"
                     />
                     <Select value={agentFilter} onValueChange={setAgentFilter}>

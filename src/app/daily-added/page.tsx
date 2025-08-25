@@ -74,6 +74,8 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import type { DailyAddedClient as Client, Agent } from '@/context/data-context';
+import { useDebounce } from '@/hooks/use-debounce';
+import { useVirtualPagination } from '@/hooks/use-virtual-pagination';
 
 type AgentStats = {
     [key: string]: {
@@ -124,7 +126,10 @@ function DailyAddedPage() {
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
   const [isImporting, setIsImporting] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
   const csvInputRef = useRef<HTMLInputElement>(null);
+  
+  const debouncedSearch = useDebounce(searchInput, 300);
   
   const editForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -138,25 +143,35 @@ function DailyAddedPage() {
     return dailyAddedClients;
   }, [dailyAddedClients, user, dataLoading]);
   
+  const sortedClients = useMemo(() => {
+    return [...userVisibleClients].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [userVisibleClients]);
+
+  const filters = useMemo(() => ({
+    agent: agentFilter,
+    month: monthFilter,
+    year: yearFilter
+  }), [agentFilter, monthFilter, yearFilter]);
+
   const filteredClients = useMemo(() => {
-     return userVisibleClients.filter(client => {
-        const lowercasedTerm = searchTerm.toLowerCase();
-        const matchesSearch = searchTerm.trim() === '' ||
-            client.name.toLowerCase().includes(lowercasedTerm) ||
-            String(client.age).includes(lowercasedTerm) ||
-            client.location.toLowerCase().includes(lowercasedTerm) ||
-            client.work.toLowerCase().includes(lowercasedTerm) ||
-            client.assignedAgent.toLowerCase().includes(lowercasedTerm);
+    return sortedClients.filter(client => {
+      const lowercasedTerm = debouncedSearch.toLowerCase();
+      const matchesSearch = debouncedSearch.trim() === '' ||
+          client.name.toLowerCase().includes(lowercasedTerm) ||
+          String(client.age).includes(lowercasedTerm) ||
+          client.location.toLowerCase().includes(lowercasedTerm) ||
+          client.work.toLowerCase().includes(lowercasedTerm) ||
+          client.assignedAgent.toLowerCase().includes(lowercasedTerm);
 
-        const matchesAgent = agentFilter === 'all' || client.assignedAgent === agentFilter;
-        
-        const clientDate = new Date(client.date);
-        const matchesMonth = monthFilter === 'all' || getMonth(clientDate) === parseInt(monthFilter);
-        const matchesYear = yearFilter === 'all' || getYear(clientDate) === parseInt(yearFilter);
+      const matchesAgent = agentFilter === 'all' || client.assignedAgent === agentFilter;
+      
+      const clientDate = new Date(client.date);
+      const matchesMonth = monthFilter === 'all' || getMonth(clientDate) === parseInt(monthFilter);
+      const matchesYear = yearFilter === 'all' || getYear(clientDate) === parseInt(yearFilter);
 
-        return matchesSearch && matchesAgent && matchesMonth && matchesYear;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [userVisibleClients, searchTerm, agentFilter, monthFilter, yearFilter]);
+      return matchesSearch && matchesAgent && matchesMonth && matchesYear;
+    });
+  }, [sortedClients, debouncedSearch, agentFilter, monthFilter, yearFilter]);
 
 
   const calculateStats = useCallback(() => {
@@ -530,7 +545,7 @@ Location: UAE" className='min-h-[150px] mt-2' value={pastedDetails} onChange={(e
                          <div className="flex flex-col sm:flex-row gap-4 mb-4">
                             <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Search clients..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                            <Input placeholder="Search clients..." className="pl-10" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
                             </div>
                             {canManage && (
                                 <Select value={agentFilter} onValueChange={setAgentFilter}>

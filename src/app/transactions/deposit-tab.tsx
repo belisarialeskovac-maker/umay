@@ -75,6 +75,7 @@ import { useAuth } from "@/context/auth-context"
 import type { Deposit } from "@/context/data-context"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
+import { useDebounce } from '@/hooks/use-debounce';
 
 const paymentModes = ["Ewallet/Online Banking", "Crypto"] as const
 
@@ -107,6 +108,7 @@ export default function DepositTab() {
   const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
+  const debouncedSearch = useDebounce(searchInput, 300);
 
   const [depositToEdit, setDepositToEdit] = useState<Deposit | null>(null);
   const [depositToDelete, setDepositToDelete] = useState<Deposit | null>(null);
@@ -114,7 +116,7 @@ export default function DepositTab() {
   const [selectedDeposits, setSelectedDeposits] = useState<string[]>([]);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [agentFilter, setAgentFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
@@ -152,8 +154,8 @@ export default function DepositTab() {
   const filteredDeposits = useMemo(() => {
     let sortedDeposits = [...deposits].sort((a,b) => b.date.getTime() - a.date.getTime());
     return sortedDeposits.filter(deposit => {
-        const lowercasedTerm = searchTerm.toLowerCase();
-        const matchesSearch = searchTerm.trim() === '' ||
+        const lowercasedTerm = debouncedSearch.toLowerCase();
+        const matchesSearch = debouncedSearch.trim() === '' ||
             deposit.shopId.toLowerCase().includes(lowercasedTerm) ||
             deposit.clientName.toLowerCase().includes(lowercasedTerm) ||
             deposit.agent.toLowerCase().includes(lowercasedTerm) ||
@@ -168,7 +170,7 @@ export default function DepositTab() {
 
         return matchesSearch && matchesAgent && matchesMonth && matchesYear;
     });
-  }, [deposits, searchTerm, agentFilter, monthFilter, yearFilter]);
+  }, [deposits, debouncedSearch, agentFilter, monthFilter, yearFilter]);
 
   const paginatedDeposits = useMemo(() => {
     const startIndex = (currentPage - 1) * DEPOSITS_PER_PAGE;
@@ -180,10 +182,10 @@ export default function DepositTab() {
 
   useEffect(() => {
     setSelectedDeposits([]);
-  }, [currentPage, agentFilter, monthFilter, yearFilter, searchTerm]);
+  }, [currentPage, agentFilter, monthFilter, yearFilter, debouncedSearch]);
 
   const resetFilters = useCallback(() => {
-    setSearchTerm("");
+    setSearchInput("");
     setAgentFilter("all");
     setMonthFilter("all");
     setYearFilter("all");
@@ -620,7 +622,7 @@ export default function DepositTab() {
       <div className="flex flex-col sm:flex-row gap-4 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search deposits..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <Input placeholder="Search deposits..." className="pl-10" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
         </div>
         {canManage && (
             <Select value={agentFilter} onValueChange={setAgentFilter}>
