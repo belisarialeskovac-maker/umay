@@ -301,11 +301,13 @@ function ShopDetailsPage() {
     Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
+        transformHeader: header => header.trim(),
         complete: (results) => {
             const requiredHeaders = ["shopId", "clientName", "agent", "kycCompletedDate", "status"];
             const headers = results.meta.fields || [];
+            const lowercasedHeaders = headers.map(h => h.toLowerCase());
 
-            if (!requiredHeaders.every(h => headers.includes(h))) {
+            if (!requiredHeaders.every(h => lowercasedHeaders.includes(h.toLowerCase()))) {
                 toast({
                     title: "Invalid CSV Format",
                     description: `CSV must contain the headers: ${requiredHeaders.join(', ')}`,
@@ -318,23 +320,41 @@ function ShopDetailsPage() {
             const existingShopIds = new Set(allClients.map(c => c.shopId));
             
             const validatedData = clientsData.map(row => {
-                if (existingShopIds.has(row.shopId)) {
+                // Find keys case-insensitively
+                const getRowValue = (key: string) => {
+                    const actualHeader = headers.find(h => h.toLowerCase() === key.toLowerCase());
+                    return actualHeader ? row[actualHeader] : undefined;
+                };
+
+                const shopId = getRowValue('shopId');
+                if (existingShopIds.has(shopId)) {
                     return { data: row, status: 'Duplicate ID', reason: 'Shop ID already exists.' };
                 }
                 
-                let kycDate = new Date(row.kycCompletedDate);
+                let kycDate = new Date(getRowValue('kycCompletedDate'));
                 if (!isValid(kycDate)) {
-                    kycDate = parseISO(row.kycCompletedDate);
+                    kycDate = parseISO(getRowValue('kycCompletedDate'));
                 }
 
                 if (!isValid(kycDate)) {
                     return { data: row, status: 'Invalid Data', reason: 'Invalid date format for kycCompletedDate.' };
                 }
-                if (!clientStatus.includes(row.status)) {
+                const statusValue = getRowValue('status');
+                if (!clientStatus.includes(statusValue)) {
                     return { data: row, status: 'Invalid Data', reason: `Status must be one of: ${clientStatus.join(', ')}` };
                 }
 
-                return { data: { ...row, kycCompletedDate: kycDate, clientDetails: row.clientDetails || '' }, status: 'Ready to Import' };
+                const finalData = {
+                    shopId: shopId,
+                    clientName: getRowValue('clientName'),
+                    agent: getRowValue('agent'),
+                    kycCompletedDate: kycDate,
+                    status: statusValue,
+                    clientDetails: getRowValue('clientDetails') || ''
+                };
+
+
+                return { data: finalData, status: 'Ready to Import' };
             });
 
             setPreviewData(validatedData);
@@ -352,7 +372,7 @@ function ShopDetailsPage() {
     if(csvInputRef.current) {
         csvInputRef.current.value = "";
     }
-  }, [allClients, toast, agents]);
+  }, [allClients, toast]);
 
   const handleConfirmImport = useCallback(async () => {
     setIsImporting(true);
