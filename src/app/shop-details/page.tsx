@@ -110,9 +110,17 @@ function ShopDetailsPage() {
   const [newBulkStatus, setNewBulkStatus] = useState<typeof clientStatus[number] | ''>('');
 
 
-  const { clients, agents, loading: dataLoading } = useData();
+  const { clients: allClients, agents, loading: dataLoading } = useData();
   const { user } = useAuth();
   const { toast } = useToast()
+
+  const userVisibleClients = useMemo(() => {
+    if (!user || dataLoading) return [];
+    if (user.role === 'Admin' || user.role === 'Superadmin') {
+      return allClients;
+    }
+    return allClients.filter(c => c.agent === user.name);
+  }, [allClients, user, dataLoading]);
 
   const form = useForm<ClientFormData>({
     resolver: zodResolver(formSchema),
@@ -132,7 +140,7 @@ function ShopDetailsPage() {
   const displayAgents = useMemo(() => agents.filter(agent => agent.role !== 'Superadmin'), [agents]);
   
   const filteredClients = useMemo(() => {
-    return clients.filter(client => {
+    return userVisibleClients.filter(client => {
         const lowercasedTerm = searchTerm.toLowerCase();
         const matchesSearch = searchTerm.trim() === '' ||
             client.shopId.toLowerCase().includes(lowercasedTerm) ||
@@ -149,7 +157,7 @@ function ShopDetailsPage() {
 
         return matchesSearch && matchesAgent && matchesMonth && matchesYear;
     });
-  }, [clients, searchTerm, agentFilter, monthFilter, yearFilter]);
+  }, [userVisibleClients, searchTerm, agentFilter, monthFilter, yearFilter]);
 
   const paginatedClients = useMemo(() => {
     const startIndex = (currentPage - 1) * CLIENTS_PER_PAGE;
@@ -302,9 +310,9 @@ function ShopDetailsPage() {
   }, []);
 
   const availableYears = useMemo(() => {
-    const years = new Set(clients.map(c => getYear(c.kycCompletedDate)));
+    const years = new Set(userVisibleClients.map(c => getYear(c.kycCompletedDate)));
     return Array.from(years).sort((a,b) => b - a);
-  }, [clients]);
+  }, [userVisibleClients]);
   
   const months = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
     value: i,
@@ -400,13 +408,15 @@ function ShopDetailsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search shops..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
-        <Select value={agentFilter} onValueChange={setAgentFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by agent" /></SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all">All Agents</SelectItem>
-                {displayAgents.map(agent => (<SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>))}
-            </SelectContent>
-        </Select>
+        {canManage && (
+            <Select value={agentFilter} onValueChange={setAgentFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by agent" /></SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Agents</SelectItem>
+                    {displayAgents.map(agent => (<SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>))}
+                </SelectContent>
+            </Select>
+        )}
         <Select value={monthFilter} onValueChange={setMonthFilter}>
             <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by month" /></SelectTrigger>
             <SelectContent>
@@ -423,7 +433,7 @@ function ShopDetailsPage() {
         </Select>
       </div>
       
-      {selectedClients.length > 0 && (
+      {canManage && selectedClients.length > 0 && (
         <div className="flex items-center gap-4 mb-4 p-3 bg-muted rounded-lg">
             <p className="text-sm font-medium">{selectedClients.length} shop(s) selected.</p>
             <Button size="sm" variant="destructive" onClick={() => setBulkDeleteAlertOpen(true)}>Delete Selected</Button>
@@ -438,20 +448,20 @@ function ShopDetailsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead padding="checkbox"><Checkbox onCheckedChange={(checked) => handleSelectAll(Boolean(checked))} checked={selectedClients.length === paginatedClients.length && paginatedClients.length > 0}/></TableHead>
+                {canManage && <TableHead padding="checkbox"><Checkbox onCheckedChange={(checked) => handleSelectAll(Boolean(checked))} checked={selectedClients.length === paginatedClients.length && paginatedClients.length > 0}/></TableHead>}
                 <TableHead>Shop ID</TableHead>
                 <TableHead>Client Name</TableHead>
                 <TableHead>Agent</TableHead>
                 <TableHead>KYC Completed</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Details</TableHead>
-                <TableHead>Actions</TableHead>
+                {canManage && <TableHead>Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedClients.map((client) => (
                 <TableRow key={client.id} data-state={selectedClients.includes(client.id) && "selected"}>
-                  <TableCell padding="checkbox"><Checkbox onCheckedChange={(checked) => handleSelectClient(client.id, Boolean(checked))} checked={selectedClients.includes(client.id)}/></TableCell>
+                  {canManage && <TableCell padding="checkbox"><Checkbox onCheckedChange={(checked) => handleSelectClient(client.id, Boolean(checked))} checked={selectedClients.includes(client.id)}/></TableCell>}
                   <TableCell>{client.shopId}</TableCell>
                   <TableCell>{client.clientName}</TableCell>
                   <TableCell>{client.agent}</TableCell>
@@ -460,6 +470,7 @@ function ShopDetailsPage() {
                     <Badge variant={client.status === 'Active' ? 'default' : client.status === 'In Process' ? 'secondary' : 'destructive'}>{client.status}</Badge>
                   </TableCell>
                   <TableCell className="max-w-[200px] truncate">{client.clientDetails}</TableCell>
+                  {canManage && (
                   <TableCell>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -471,6 +482,7 @@ function ShopDetailsPage() {
                             </DropdownMenuContent>
                         </DropdownMenu>
                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -491,7 +503,7 @@ function ShopDetailsPage() {
         <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] p-6">
           <div className="text-center">
             <h2 className="text-2xl font-bold tracking-tight text-foreground">No Shops Found</h2>
-            <p className="text-muted-foreground mt-2">Try adjusting your search or filters.</p>
+            <p className="text-muted-foreground mt-2">{user?.role === 'Agent' ? "You have not been assigned any shops." : "Try adjusting your search or filters."}</p>
           </div>
         </div>
       )}
@@ -620,6 +632,4 @@ function ShopDetailsPage() {
   )
 }
 
-export default withAuth(ShopDetailsPage);
-
-    
+export default withAuth(ShopDetailsPage, ['Agent', 'Admin', 'Superadmin']);
