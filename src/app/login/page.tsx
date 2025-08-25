@@ -44,14 +44,14 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const auth = getAuth(app)
-  const { user, loading: authLoading, setInitialLogin } = useAuth()
+  const { user, setInitialLogin } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!authLoading && user) {
+    if (user) {
       router.push('/')
     }
-  }, [user, authLoading, router]);
+  }, [user, router]);
 
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -71,8 +71,6 @@ export default function LoginPage() {
         description: "Welcome back!",
       })
       setInitialLogin(true);
-      // The onAuthStateChanged listener in AuthProvider will handle the redirect
-      // and AppShell will show the loading screen.
     } catch (error: any) {
       console.error("Login failed:", error)
       toast({
@@ -84,12 +82,10 @@ export default function LoginPage() {
     } 
   }
   
-  if (authLoading || user) {
-    // Show a minimal loader while waiting for auth state or redirect
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-      </div>
-    );
+  // If the user is already logged in, the useEffect above will redirect them.
+  // We can render the form while that check happens to avoid a flash of a loader.
+  if (user) {
+      return null;
   }
 
   return (
