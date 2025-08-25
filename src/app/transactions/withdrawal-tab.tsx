@@ -60,6 +60,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -107,6 +108,8 @@ export default function WithdrawalTab() {
   
   const [withdrawalToEdit, setWithdrawalToEdit] = useState<Withdrawal | null>(null);
   const [withdrawalToDelete, setWithdrawalToDelete] = useState<Withdrawal | null>(null);
+  const [bulkDeleteAlertOpen, setBulkDeleteAlertOpen] = useState(false);
+  const [selectedWithdrawals, setSelectedWithdrawals] = useState<string[]>([]);
   
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -171,6 +174,10 @@ export default function WithdrawalTab() {
   }, [filteredWithdrawals, currentPage]);
   
   const totalPages = Math.ceil(filteredWithdrawals.length / WITHDRAWALS_PER_PAGE);
+
+  useEffect(() => {
+    setSelectedWithdrawals([]);
+  }, [currentPage, agentFilter, status, monthFilter, yearFilter, searchTerm]);
 
   const resetFilters = useCallback(() => {
     setSearchTerm("");
@@ -262,6 +269,21 @@ export default function WithdrawalTab() {
     setDeleteAlertOpen(false);
     setWithdrawalToDelete(null);
   }, [withdrawalToDelete, toast]);
+
+  const handleBulkDelete = useCallback(async () => {
+    const batch = writeBatch(db);
+    selectedWithdrawals.forEach(id => {
+      batch.delete(doc(db, "withdrawals", id));
+    });
+    try {
+      await batch.commit();
+      toast({ title: "Withdrawals Deleted", description: `${selectedWithdrawals.length} withdrawals have been deleted.` });
+      setSelectedWithdrawals([]);
+    } catch(error: any) {
+      toast({ title: "Error", description: "Failed to delete selected withdrawals.", variant: "destructive" });
+    }
+    setBulkDeleteAlertOpen(false);
+  }, [selectedWithdrawals, toast]);
 
   const handleCsvUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -384,6 +406,14 @@ export default function WithdrawalTab() {
   const openDeleteDialog = useCallback((withdrawal: Withdrawal) => {
     setWithdrawalToDelete(withdrawal);
     setDeleteAlertOpen(true);
+  }, []);
+
+  const handleSelectAll = useCallback((checked: boolean) => {
+    setSelectedWithdrawals(checked ? paginatedWithdrawals.map(w => w.id) : []);
+  }, [paginatedWithdrawals]);
+
+  const handleSelectWithdrawal = useCallback((withdrawalId: string, checked: boolean) => {
+    setSelectedWithdrawals(prev => checked ? [...prev, withdrawalId] : prev.filter(id => id !== withdrawalId));
   }, []);
 
   const availableYears = useMemo(() => {
@@ -593,12 +623,20 @@ export default function WithdrawalTab() {
         </Select>
       </div>
 
+      {canManage && selectedWithdrawals.length > 0 && (
+        <div className="flex items-center gap-4 mb-4 p-3 bg-muted rounded-lg">
+            <p className="text-sm font-medium">{selectedWithdrawals.length} withdrawal(s) selected.</p>
+            <Button size="sm" variant="destructive" onClick={() => setBulkDeleteAlertOpen(true)}>Delete Selected</Button>
+        </div>
+      )}
+
       {paginatedWithdrawals.length > 0 ? (
         <>
         <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
+                 {canManage && <TableHead><Checkbox onCheckedChange={(checked) => handleSelectAll(Boolean(checked))} checked={selectedWithdrawals.length === paginatedWithdrawals.length && paginatedWithdrawals.length > 0} /></TableHead>}
                 <TableHead>Shop ID</TableHead>
                 <TableHead>Client Name</TableHead>
                 <TableHead>Agent</TableHead>
@@ -610,7 +648,8 @@ export default function WithdrawalTab() {
             </TableHeader>
             <TableBody>
               {paginatedWithdrawals.map((withdrawal) => (
-                <TableRow key={withdrawal.id}>
+                <TableRow key={withdrawal.id} data-state={selectedWithdrawals.includes(withdrawal.id) && "selected"}>
+                  {canManage && <TableCell><Checkbox onCheckedChange={(checked) => handleSelectWithdrawal(withdrawal.id, Boolean(checked))} checked={selectedWithdrawals.includes(withdrawal.id)} /></TableCell>}
                   <TableCell>{withdrawal.shopId}</TableCell>
                   <TableCell>{withdrawal.clientName}</TableCell>
                   <TableCell>{withdrawal.agent}</TableCell>
@@ -731,6 +770,22 @@ export default function WithdrawalTab() {
         </AlertDialogContent>
     </AlertDialog>
 
+     {/* Bulk Delete Dialog */}
+     <AlertDialog open={bulkDeleteAlertOpen} onOpenChange={setBulkDeleteAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the selected {selectedWithdrawals.length} withdrawal records.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleBulkDelete}>Delete All</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
      {/* CSV Preview Dialog */}
     <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
         <DialogContent className="max-w-4xl">
@@ -785,5 +840,3 @@ export default function WithdrawalTab() {
     </div>
   )
 }
-
-    

@@ -60,6 +60,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -109,6 +110,8 @@ export default function DepositTab() {
 
   const [depositToEdit, setDepositToEdit] = useState<Deposit | null>(null);
   const [depositToDelete, setDepositToDelete] = useState<Deposit | null>(null);
+  const [bulkDeleteAlertOpen, setBulkDeleteAlertOpen] = useState(false);
+  const [selectedDeposits, setSelectedDeposits] = useState<string[]>([]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -173,6 +176,10 @@ export default function DepositTab() {
   }, [filteredDeposits, currentPage]);
   
   const totalPages = Math.ceil(filteredDeposits.length / DEPOSITS_PER_PAGE);
+
+  useEffect(() => {
+    setSelectedDeposits([]);
+  }, [currentPage, agentFilter, status, monthFilter, yearFilter, searchTerm]);
 
   const resetFilters = useCallback(() => {
     setSearchTerm("");
@@ -264,6 +271,21 @@ export default function DepositTab() {
     setDeleteAlertOpen(false);
     setDepositToDelete(null);
   }, [depositToDelete, toast]);
+
+  const handleBulkDelete = useCallback(async () => {
+    const batch = writeBatch(db);
+    selectedDeposits.forEach(id => {
+      batch.delete(doc(db, "deposits", id));
+    });
+    try {
+      await batch.commit();
+      toast({ title: "Deposits Deleted", description: `${selectedDeposits.length} deposits have been deleted.` });
+      setSelectedDeposits([]);
+    } catch(error: any) {
+      toast({ title: "Error", description: "Failed to delete selected deposits.", variant: "destructive" });
+    }
+    setBulkDeleteAlertOpen(false);
+  }, [selectedDeposits, toast]);
 
   const handleCsvUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -386,6 +408,14 @@ export default function DepositTab() {
   const openDeleteDialog = useCallback((deposit: Deposit) => {
     setDepositToDelete(deposit);
     setDeleteAlertOpen(true);
+  }, []);
+
+  const handleSelectAll = useCallback((checked: boolean) => {
+    setSelectedDeposits(checked ? paginatedDeposits.map(d => d.id) : []);
+  }, [paginatedDeposits]);
+
+  const handleSelectDeposit = useCallback((depositId: string, checked: boolean) => {
+    setSelectedDeposits(prev => checked ? [...prev, depositId] : prev.filter(id => id !== depositId));
   }, []);
 
   const availableYears = useMemo(() => {
@@ -596,12 +626,20 @@ export default function DepositTab() {
         </Select>
       </div>
 
+       {canManage && selectedDeposits.length > 0 && (
+        <div className="flex items-center gap-4 mb-4 p-3 bg-muted rounded-lg">
+            <p className="text-sm font-medium">{selectedDeposits.length} deposit(s) selected.</p>
+            <Button size="sm" variant="destructive" onClick={() => setBulkDeleteAlertOpen(true)}>Delete Selected</Button>
+        </div>
+      )}
+
       {paginatedDeposits.length > 0 ? (
         <>
         <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
+                {canManage && <TableHead><Checkbox onCheckedChange={(checked) => handleSelectAll(Boolean(checked))} checked={selectedDeposits.length === paginatedDeposits.length && paginatedDeposits.length > 0} /></TableHead>}
                 <TableHead>Shop ID</TableHead>
                 <TableHead>Client Name</TableHead>
                 <TableHead>Agent</TableHead>
@@ -613,7 +651,8 @@ export default function DepositTab() {
             </TableHeader>
             <TableBody>
               {paginatedDeposits.map((deposit) => (
-                <TableRow key={deposit.id}>
+                <TableRow key={deposit.id} data-state={selectedDeposits.includes(deposit.id) && "selected"}>
+                   {canManage && <TableCell><Checkbox onCheckedChange={(checked) => handleSelectDeposit(deposit.id, Boolean(checked))} checked={selectedDeposits.includes(deposit.id)} /></TableCell>}
                   <TableCell>{deposit.shopId}</TableCell>
                   <TableCell>{deposit.clientName}</TableCell>
                   <TableCell>{deposit.agent}</TableCell>
@@ -733,6 +772,22 @@ export default function DepositTab() {
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
+    
+    {/* Bulk Delete Dialog */}
+     <AlertDialog open={bulkDeleteAlertOpen} onOpenChange={setBulkDeleteAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the selected {selectedDeposits.length} deposit records.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleBulkDelete}>Delete All</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
 
      {/* CSV Preview Dialog */}
     <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
@@ -788,5 +843,3 @@ export default function DepositTab() {
     </div>
   )
 }
-
-    
