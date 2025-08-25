@@ -1,14 +1,16 @@
 
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { format, getMonth, getYear } from "date-fns"
-import { CalendarIcon, Loader2, MoreHorizontal, Edit, Trash2, Search } from "lucide-react"
+import { format, getMonth, getYear, parseISO, isValid } from "date-fns"
+import { CalendarIcon, Loader2, MoreHorizontal, Edit, Trash2, Search, Upload } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import Papa from "papaparse";
+
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -70,6 +72,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useData } from "@/context/data-context"
 import { useAuth } from "@/context/auth-context"
 import type { Withdrawal } from "@/context/data-context"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Badge } from "@/components/ui/badge"
 
 const paymentModes = ["Ewallet/Online Banking", "Crypto"] as const
 
@@ -84,12 +88,22 @@ const formSchema = z.object({
   paymentMode: z.enum(paymentModes),
 })
 
+type PreviewRow = {
+    data: any;
+    status: 'Ready to Import' | 'Invalid Data';
+    reason?: string;
+}
+
 const WITHDRAWALS_PER_PAGE = 20;
 
 export default function WithdrawalTab() {
   const [open, setOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false);
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
+  const csvInputRef = useRef<HTMLInputElement>(null);
   
   const [withdrawalToEdit, setWithdrawalToEdit] = useState<Withdrawal | null>(null);
   const [withdrawalToDelete, setWithdrawalToDelete] = useState<Withdrawal | null>(null);
@@ -248,6 +262,115 @@ export default function WithdrawalTab() {
     setDeleteAlertOpen(false);
     setWithdrawalToDelete(null);
   }, [withdrawalToDelete, toast]);
+
+  const handleCsvUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: header => header.trim().toLowerCase(),
+        complete: (results) => {
+            const requiredHeaders = ["shopid", "agent", "date", "amount", "payment"];
+            const headers = results.meta.fields || [];
+
+            if (!requiredHeaders.every(h => headers.includes(h))) {
+                toast({
+                    title: "Invalid CSV Format",
+                    description: `CSV must contain the headers: ${requiredHeaders.join(', ')}`,
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            const clientsMap = new Map(clients.map(c => [c.shopId.toLowerCase(), c]));
+            
+            const validatedData = results.data.map((row: any) => {
+                const shopId = row.shopid;
+                const client = clientsMap.get(shopId?.toLowerCase());
+                
+                if (!client) {
+                    return { data: row, status: 'Invalid Data', reason: 'Shop ID not found.' };
+                }
+
+                const transactionDate = new Date(row.date);
+                if (!isValid(transactionDate)) {
+                    return { data: row, status: 'Invalid Data', reason: 'Invalid date format.' };
+                }
+                
+                let paymentMode = row.payment;
+                if (['ewallet', 'online banking'].includes(paymentMode.toLowerCase())) {
+                    paymentMode = 'Ewallet/Online Banking';
+                } else if (paymentMode.toLowerCase() !== 'crypto') {
+                    return { data: row, status: 'Invalid Data', reason: 'Invalid payment mode.' };
+                }
+                
+                const amount = parseFloat(row.amount);
+                if (isNaN(amount) || amount <= 0) {
+                     return { data: row, status: 'Invalid Data', reason: 'Amount must be a positive number.' };
+                }
+
+                const finalData = {
+                    shopId: client.shopId,
+                    clientName: client.clientName,
+                    agent: row.agent,
+                    date: transactionDate,
+                    amount: amount,
+                    paymentMode: paymentMode
+                };
+
+                return { data: finalData, status: 'Ready to Import' };
+            });
+
+            setPreviewData(validatedData);
+            setPreviewDialogOpen(true);
+        },
+        error: (error) => {
+            toast({ title: "CSV Parsing Error", description: error.message, variant: "destructive" });
+        }
+    });
+
+    if(csvInputRef.current) {
+        csvInputRef.current.value = "";
+    }
+  }, [clients, toast]);
+
+  const handleConfirmImport = useCallback(async () => {
+    setIsImporting(true);
+    const batch = writeBatch(db);
+    let importedCount = 0;
+    
+    previewData.forEach(row => {
+        if(row.status === 'Ready to Import') {
+            const withdrawalRef = doc(collection(db, "withdrawals"));
+            batch.set(withdrawalRef, row.data);
+            importedCount++;
+        }
+    });
+
+    if (importedCount === 0) {
+        toast({ title: "No Withdrawals to Import", description: "There are no valid new withdrawals to import.", variant: "destructive"});
+        setIsImporting(false);
+        setPreviewDialogOpen(false);
+        return;
+    }
+
+    try {
+        await batch.commit();
+        toast({
+            title: "Import Complete",
+            description: `${importedCount} withdrawals imported successfully.`,
+        });
+        resetFilters();
+    } catch (error) {
+        toast({ title: "Import Error", description: "An error occurred during the batch import.", variant: "destructive" });
+    } finally {
+        setIsImporting(false);
+        setPreviewDialogOpen(false);
+        setPreviewData([]);
+    }
+  }, [previewData, toast, resetFilters]);
   
   const openEditDialog = useCallback((withdrawal: Withdrawal) => {
     setWithdrawalToEdit(withdrawal);
@@ -276,6 +399,7 @@ export default function WithdrawalTab() {
   const clientFound = !!watchedShopId && clients.some(c => c.shopId === watchedShopId);
   const clientFoundEdit = !!watchedEditShopId && clients.some(c => c.shopId === watchedEditShopId);
   const canManage = user?.role === 'Admin' || user?.role === 'Superadmin';
+  const readyToImportCount = useMemo(() => previewData.filter(row => row.status === 'Ready to Import').length, [previewData]);
 
   if (dataLoading) {
     return (
@@ -287,8 +411,14 @@ export default function WithdrawalTab() {
 
   return (
     <div className="w-full h-full">
-      <div className="flex justify-end mb-6">
+      <div className="flex justify-end mb-6 gap-2">
         {canManage && (
+           <>
+            <Button variant="outline" onClick={() => csvInputRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" />
+                Import CSV
+            </Button>
+            <input type="file" ref={csvInputRef} accept=".csv" onChange={handleCsvUpload} className="hidden" />
             <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <Button>Add New Withdrawal</Button>
@@ -429,6 +559,7 @@ export default function WithdrawalTab() {
                 </Form>
             </DialogContent>
             </Dialog>
+           </>
         )}
       </div>
 
@@ -599,6 +730,60 @@ export default function WithdrawalTab() {
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
+
+     {/* CSV Preview Dialog */}
+    <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>CSV Import Preview</DialogTitle>
+                <DialogDescription>
+                    Review the data to be imported. Invalid rows are automatically excluded.
+                </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="h-[60vh] rounded-md border">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Shop ID</TableHead>
+                            <TableHead>Client Name</TableHead>
+                            <TableHead>Agent</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Payment</TableHead>
+                            <TableHead>Reason</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {previewData.map((row, index) => (
+                            <TableRow key={index}>
+                                <TableCell>
+                                    <Badge variant={row.status === 'Ready to Import' ? 'default' : 'destructive'}>
+                                        {row.status}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>{row.data.shopId || row.data.shopid}</TableCell>
+                                <TableCell>{row.data.clientName}</TableCell>
+                                <TableCell>{row.data.agent}</TableCell>
+                                <TableCell>{row.data.date ? format(new Date(row.data.date), "PPP") : 'Invalid'}</TableCell>
+                                <TableCell>${Number(row.data.amount || 0).toFixed(2)}</TableCell>
+                                <TableCell>{row.data.paymentMode || row.data.payment}</TableCell>
+                                <TableCell>{row.reason || 'N/A'}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
+            <DialogFooter>
+                <Button variant="ghost" onClick={() => setPreviewDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleConfirmImport} disabled={isImporting || readyToImportCount === 0}>
+                    {isImporting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Importing...</> : `Confirm Import (${readyToImportCount})`}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
     </div>
   )
 }
+
+    
