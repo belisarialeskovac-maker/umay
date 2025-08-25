@@ -8,7 +8,7 @@ import { z } from "zod"
 import { format, getMonth, getYear, setMonth, setYear } from "date-fns"
 import { CalendarIcon, Loader2, MoreHorizontal, Edit, Trash2, Search } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch, query, where, getDocs } from "firebase/firestore";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -166,6 +166,18 @@ function ShopDetailsPage() {
 
   async function onSubmit(values: ClientFormData) {
     try {
+      // Check for unique shopId
+      const q = query(collection(db, "clients"), where("shopId", "==", values.shopId));
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        toast({
+            title: "Error",
+            description: "This Shop ID is already in use. Please choose another.",
+            variant: "destructive",
+        });
+        return;
+      }
+
       await addDoc(collection(db, "clients"), values);
       toast({
         title: "Shop Added",
@@ -186,6 +198,19 @@ function ShopDetailsPage() {
   async function onEditSubmit(values: ClientFormData) {
     if (!clientToEdit) return;
     try {
+        // Check for unique shopId if it has changed
+        if (values.shopId !== clientToEdit.shopId) {
+            const q = query(collection(db, "clients"), where("shopId", "==", values.shopId));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                toast({
+                    title: "Error",
+                    description: "This Shop ID is already in use by another shop.",
+                    variant: "destructive",
+                });
+                return;
+            }
+        }
         const clientRef = doc(db, "clients", clientToEdit.id);
         await updateDoc(clientRef, values);
         toast({ title: "Shop Updated", description: "Shop details have been updated." });
@@ -596,5 +621,3 @@ function ShopDetailsPage() {
 }
 
 export default withAuth(ShopDetailsPage);
-
-    
