@@ -120,6 +120,7 @@ function ShopDetailsPage() {
   const [monthFilter, setMonthFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
   const [newBulkStatus, setNewBulkStatus] = useState<typeof clientStatus[number] | ''>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const csvInputRef = useRef<HTMLInputElement>(null);
 
@@ -191,6 +192,7 @@ function ShopDetailsPage() {
   }, [searchTerm, agentFilter, statusFilter, monthFilter, yearFilter]);
 
   const onSubmit = useCallback(async (values: ClientFormData) => {
+    setIsSubmitting(true);
     try {
       // Check for unique shopId
       const q = query(collection(db, "clients"), where("shopId", "==", values.shopId));
@@ -218,6 +220,8 @@ function ShopDetailsPage() {
         description: "Failed to add shop.",
         variant: "destructive"
       });
+    } finally {
+        setIsSubmitting(false);
     }
   }, [form, toast]);
 
@@ -557,7 +561,13 @@ function ShopDetailsPage() {
                         <FormField control={form.control} name="clientDetails" render={({ field }) => (
                             <FormItem><FormLabel>Client Details</FormLabel><FormControl><Textarea placeholder="Enter client details..." {...field} /></FormControl><FormMessage /></FormItem>
                         )}/>
-                        <DialogFooter><Button type="submit">Add Shop</Button></DialogFooter>
+                        <DialogFooter>
+                            <Button type="submit" disabled={isSubmitting}>
+                                {isSubmitting ? (
+                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Adding Shop...</>
+                                ) : "Add Shop"}
+                            </Button>
+                        </DialogFooter>
                     </form>
                     </Form>
                 </DialogContent>
