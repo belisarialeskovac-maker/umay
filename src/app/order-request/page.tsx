@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Check, X, Hourglass, ThumbsUp, ThumbsDown, Loader2, MoreHorizontal, Trash2, Edit } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, updateDoc, doc, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc, deleteDoc, writeBatch } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button"
 import {
@@ -61,6 +61,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Tabs,
@@ -95,7 +96,10 @@ const formSchema = z.object({
 function OrderRequestPage() {
   const [open, setOpen] = useState(false)
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
+  const [bulkDeleteAlertOpen, setBulkDeleteAlertOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<OrderStatus>("Pending");
 
   const { orders, agents, clients, loading: dataLoading } = useData();
   const { toast } = useToast()
@@ -178,16 +182,50 @@ function OrderRequestPage() {
     setDeleteAlertOpen(false);
     setOrderToDelete(null);
   }, [orderToDelete, toast]);
+  
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedOrders.length === 0) return;
+    const batch = writeBatch(db);
+    selectedOrders.forEach(id => {
+      batch.delete(doc(db, "orders", id));
+    });
+    try {
+      await batch.commit();
+      toast({ title: "Orders Deleted", description: `${selectedOrders.length} orders have been deleted.` });
+      setSelectedOrders([]);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete selected orders.", variant: "destructive" });
+    }
+    setBulkDeleteAlertOpen(false);
+  }, [selectedOrders, toast]);
+
 
   const openDeleteDialog = (order: Order) => {
     setOrderToDelete(order);
     setDeleteAlertOpen(true);
   };
+  
+  const handleSelectOrder = (orderId: string) => {
+    setSelectedOrders(prev => 
+      prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
+    );
+  };
+
+  const handleSelectAll = (status: OrderStatus) => {
+    const ordersInTab = orders.filter(o => o.status === status);
+    const allSelected = selectedOrders.length === ordersInTab.length;
+    if (allSelected) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders(ordersInTab.map(o => o.id));
+    }
+  };
 
 
   const renderOrderTable = (status: OrderStatus) => {
     const filteredOrders = orders.filter(order => order.status === status);
-
+    const isAllSelected = filteredOrders.length > 0 && selectedOrders.length === filteredOrders.length;
+    
     if (filteredOrders.length === 0) {
       return (
         <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm h-[60vh] p-6">
@@ -208,6 +246,7 @@ function OrderRequestPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead><Checkbox checked={isAllSelected} onCheckedChange={() => handleSelectAll(status)} /></TableHead>
               <TableHead>Agent</TableHead>
               <TableHead>Shop ID</TableHead>
               <TableHead>Location</TableHead>
@@ -218,7 +257,8 @@ function OrderRequestPage() {
           </TableHeader>
           <TableBody>
             {filteredOrders.map((order) => (
-              <TableRow key={order.id}>
+              <TableRow key={order.id} data-state={selectedOrders.includes(order.id) && "selected"}>
+                <TableCell><Checkbox checked={selectedOrders.includes(order.id)} onCheckedChange={() => handleSelectOrder(order.id)} /></TableCell>
                 <TableCell>{order.agent}</TableCell>
                 <TableCell>{order.shopId}</TableCell>
                 <TableCell>{order.location}</TableCell>
@@ -397,7 +437,19 @@ function OrderRequestPage() {
         </Dialog>
       </div>
 
-      <Tabs defaultValue="Pending">
+       {selectedOrders.length > 0 && (
+        <div className="flex items-center justify-between mb-4 p-3 bg-muted rounded-lg">
+          <p className="text-sm font-medium">{selectedOrders.length} order(s) selected.</p>
+          <Button size="sm" variant="destructive" onClick={() => setBulkDeleteAlertOpen(true)}>
+            <Trash2 className="mr-2 h-4 w-4" /> Delete Selected
+          </Button>
+        </div>
+      )}
+
+      <Tabs defaultValue={activeTab} onValueChange={(value) => {
+          setActiveTab(value as OrderStatus);
+          setSelectedOrders([]);
+      }}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="Pending">
               <Hourglass className="mr-2 h-4 w-4"/>Pending
@@ -434,6 +486,21 @@ function OrderRequestPage() {
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDeleteOrder}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    
+    <AlertDialog open={bulkDeleteAlertOpen} onOpenChange={setBulkDeleteAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This will permanently delete the selected {selectedOrders.length} order records. This action cannot be undone.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleBulkDelete}>Delete All</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
