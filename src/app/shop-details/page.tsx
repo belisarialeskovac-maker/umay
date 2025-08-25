@@ -334,16 +334,13 @@ function ShopDetailsPage() {
                 if (!clientStatus.includes(row.status)) {
                     return { data: row, status: 'Invalid Data', reason: `Status must be one of: ${clientStatus.join(', ')}` };
                 }
-                 if (!row.clientDetails || row.clientDetails.trim() === '') {
-                    return { data: row, status: 'Invalid Data', reason: 'clientDetails cannot be blank.' };
-                }
                 if (!row.agent || !validAgentNames.has(row.agent.toLowerCase())) {
                     return { data: row, status: 'Invalid Data', reason: `Agent '${row.agent}' does not exist.` };
                 }
                 // Find the correct casing for the agent name
                 const originalAgentName = agents.find(a => a.name.toLowerCase() === row.agent.toLowerCase())?.name;
 
-                return { data: { ...row, kycCompletedDate: kycDate, agent: originalAgentName }, status: 'Ready to Import' };
+                return { data: { ...row, kycCompletedDate: kycDate, agent: originalAgentName, clientDetails: row.clientDetails || '' }, status: 'Ready to Import' };
             });
 
             setPreviewData(validatedData);
