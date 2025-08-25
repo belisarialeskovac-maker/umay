@@ -100,9 +100,17 @@ export default function DepositTab() {
   const [monthFilter, setMonthFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
   
-  const { deposits, clients, agents, loading: dataLoading } = useData();
+  const { deposits: allDeposits, clients, agents, loading: dataLoading } = useData();
   const { user } = useAuth();
   const { toast } = useToast()
+
+  const deposits = useMemo(() => {
+    if (!user || dataLoading) return [];
+    if (user.role === 'Admin' || user.role === 'Superadmin') {
+      return allDeposits;
+    }
+    return allDeposits.filter(d => d.agent === user.name);
+  }, [allDeposits, user, dataLoading]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -150,9 +158,13 @@ export default function DepositTab() {
   
   const totalPages = Math.ceil(filteredDeposits.length / DEPOSITS_PER_PAGE);
 
-  useEffect(() => {
+  const resetFilters = useCallback(() => {
+    setSearchTerm("");
+    setAgentFilter("all");
+    setMonthFilter("all");
+    setYearFilter("all");
     setCurrentPage(1);
-  }, [searchTerm, agentFilter, monthFilter, yearFilter]);
+  }, []);
 
   const watchedShopId = form.watch("shopId");
   const watchedEditShopId = editForm.watch("shopId");
@@ -425,13 +437,15 @@ export default function DepositTab() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search deposits..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
-        <Select value={agentFilter} onValueChange={setAgentFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by agent" /></SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all">All Agents</SelectItem>
-                {displayAgents.map(agent => (<SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>))}
-            </SelectContent>
-        </Select>
+        {canManage && (
+            <Select value={agentFilter} onValueChange={setAgentFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by agent" /></SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Agents</SelectItem>
+                    {displayAgents.map(agent => (<SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>))}
+                </SelectContent>
+            </Select>
+        )}
         <Select value={monthFilter} onValueChange={setMonthFilter}>
             <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by month" /></SelectTrigger>
             <SelectContent>
@@ -460,7 +474,7 @@ export default function DepositTab() {
                 <TableHead>Date</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Payment Mode</TableHead>
-                <TableHead>Actions</TableHead>
+                {canManage && <TableHead>Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -472,7 +486,8 @@ export default function DepositTab() {
                   <TableCell>{format(deposit.date, "PPP")}</TableCell>
                   <TableCell>${deposit.amount.toFixed(2)}</TableCell>
                   <TableCell>{deposit.paymentMode}</TableCell>
-                  <TableCell>
+                  {canManage && (
+                    <TableCell>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -483,6 +498,7 @@ export default function DepositTab() {
                             </DropdownMenuContent>
                         </DropdownMenu>
                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -586,5 +602,3 @@ export default function DepositTab() {
     </div>
   )
 }
-
-    
