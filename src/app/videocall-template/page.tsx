@@ -226,7 +226,8 @@ export default function VideoCallTemplatePage() {
                 console.error("Failed to save form data to Firestore", error);
             }
         };
-        saveData();
+        const timer = setTimeout(saveData, 500); // Debounce saving
+        return () => clearTimeout(timer);
     }
   }, [formData, isMounted, updateProgress]);
 
@@ -714,3 +715,5 @@ export default function VideoCallTemplatePage() {
     </div>
   )
 }
+
+    
