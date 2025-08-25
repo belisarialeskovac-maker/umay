@@ -150,8 +150,8 @@ function ProfilePage() {
     if (user && !dataLoading) {
         const filterByName = (collection: any[]) => collection.filter(item => item.agent === user.name || item.assignedAgent === user.name);
         setAgentClients(filterByName(clients));
-        setAgentDeposits(filterByName(deposits));
-        setAgentWithdrawals(filterByName(withdrawals));
+        setAgentDeposits(filterByName(deposits).sort((a, b) => b.date.getTime() - a.date.getTime()));
+        setAgentWithdrawals(filterByName(withdrawals).sort((a, b) => b.date.getTime() - a.date.getTime()));
         setAgentInventory(filterByName(inventory));
         setAgentOrders(filterByName(orders));
         setAgentAbsences(filterByName(absences));
