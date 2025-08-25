@@ -453,7 +453,7 @@ function DailyAddedPage() {
                     <div>
                         <h2 className="text-xl font-semibold mb-4 flex items-center"><TrendingUp className="mr-2 h-5 w-5" /> Overall Performance</h2>
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            <Card className="hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                            <Card className="border-border/50 hover:border-primary/80 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
                                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                                     <CardTitle className="text-sm font-medium text-muted-foreground">Daily Clients</CardTitle>
                                     <User className="h-4 w-4 text-muted-foreground" />
@@ -463,7 +463,7 @@ function DailyAddedPage() {
                                     <p className="text-xs text-muted-foreground">Clients added today</p>
                                 </CardContent>
                             </Card>
-                            <Card className="hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                            <Card className="border-border/50 hover:border-primary/80 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
                                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                                     <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Clients</CardTitle>
                                     <CalendarDays className="h-4 w-4 text-muted-foreground" />
@@ -473,7 +473,7 @@ function DailyAddedPage() {
                                     <p className="text-xs text-muted-foreground">Clients added this month</p>
                                 </CardContent>
                             </Card>
-                             <Card className="hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                             <Card className="border-border/50 hover:border-primary/80 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
                                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                                     <CardTitle className="text-sm font-medium text-muted-foreground">Total Clients</CardTitle>
                                     <Users className="h-4 w-4 text-muted-foreground" />
@@ -488,7 +488,7 @@ function DailyAddedPage() {
                             <h2 className="text-xl font-semibold my-6 flex items-center"><UserCheckIcon className="mr-2 h-5 w-5" /> Agent Performance</h2>
                             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                                 {Object.keys(agentStats).length > 0 ? Object.entries(agentStats).map(([agent, stats]) => (
-                                    <Card key={agent} className="hover:border-primary/50 hover:shadow-md transition-all duration-300">
+                                    <Card key={agent} className="border-border/50 hover:border-primary/50 hover:shadow-md transition-all duration-300">
                                         <CardHeader className="pb-2">
                                             <CardTitle className="text-base font-medium flex items-center justify-between">
                                                 {agent}
