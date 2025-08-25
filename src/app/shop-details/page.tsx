@@ -74,6 +74,7 @@ import { useData } from "@/context/data-context"
 import { useAuth } from "@/context/auth-context"
 import withAuth from "@/components/with-auth"
 import type { Client } from "@/context/data-context"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 const clientStatus = ["In Process", "Active", "Eliminated"] as const;
 
@@ -89,6 +90,12 @@ const formSchema = z.object({
 })
 
 type ClientFormData = z.infer<typeof formSchema>;
+type PreviewRow = {
+    data: any;
+    status: 'Ready to Import' | 'Duplicate ID' | 'Invalid Data';
+    reason?: string;
+}
+
 
 const CLIENTS_PER_PAGE = 20;
 
@@ -98,10 +105,13 @@ function ShopDetailsPage() {
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false)
   const [bulkDeleteAlertOpen, setBulkDeleteAlertOpen] = useState(false)
   const [bulkStatusDialogOpen, setBulkStatusDialogOpen] = useState(false)
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [selectedClients, setSelectedClients] = useState<string[]>([])
+  const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -291,7 +301,7 @@ function ShopDetailsPage() {
     Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: async (results) => {
+        complete: (results) => {
             const requiredHeaders = ["shopId", "clientName", "agent", "kycCompletedDate", "status", "clientDetails"];
             const headers = results.meta.fields || [];
 
@@ -305,47 +315,24 @@ function ShopDetailsPage() {
             }
 
             const clientsData = results.data as any[];
-            const batch = writeBatch(db);
-            let importedCount = 0;
-            let skippedCount = 0;
-
             const existingShopIds = new Set(allClients.map(c => c.shopId));
-
-            for (const clientData of clientsData) {
-                if (existingShopIds.has(clientData.shopId)) {
-                    skippedCount++;
-                    continue;
-                }
-
-                const kycDate = parseISO(clientData.kycCompletedDate);
-                if (!isValid(kycDate)) {
-                    skippedCount++;
-                    continue;
-                }
-
-                const newClient = {
-                    ...clientData,
-                    kycCompletedDate: kycDate,
-                };
-                
-                const clientRef = doc(collection(db, "clients"));
-                batch.set(clientRef, newClient);
-                importedCount++;
-            }
             
-            try {
-                await batch.commit();
-                toast({
-                    title: "Import Complete",
-                    description: `${importedCount} shops imported successfully. ${skippedCount} shops were skipped due to duplicate IDs or invalid data.`,
-                });
-            } catch (error) {
-                toast({
-                    title: "Import Error",
-                    description: "An error occurred during the batch import.",
-                    variant: "destructive"
-                });
-            }
+            const validatedData = clientsData.map(row => {
+                if (existingShopIds.has(row.shopId)) {
+                    return { data: row, status: 'Duplicate ID', reason: 'Shop ID already exists.' };
+                }
+                const kycDate = parseISO(row.kycCompletedDate);
+                if (!isValid(kycDate)) {
+                    return { data: row, status: 'Invalid Data', reason: 'Invalid date format for kycCompletedDate.' };
+                }
+                if (!clientStatus.includes(row.status)) {
+                    return { data: row, status: 'Invalid Data', reason: `Status must be one of: ${clientStatus.join(', ')}` };
+                }
+                return { data: { ...row, kycCompletedDate: kycDate }, status: 'Ready to Import' };
+            });
+
+            setPreviewData(validatedData);
+            setPreviewDialogOpen(true);
         },
         error: (error) => {
             toast({
@@ -360,6 +347,45 @@ function ShopDetailsPage() {
         csvInputRef.current.value = "";
     }
   }, [allClients, toast]);
+
+  const handleConfirmImport = useCallback(async () => {
+    setIsImporting(true);
+    const batch = writeBatch(db);
+    let importedCount = 0;
+    
+    previewData.forEach(row => {
+        if(row.status === 'Ready to Import') {
+            const clientRef = doc(collection(db, "clients"));
+            batch.set(clientRef, row.data);
+            importedCount++;
+        }
+    });
+
+    if (importedCount === 0) {
+        toast({ title: "No Shops to Import", description: "There are no valid new shops to import.", variant: "destructive"});
+        setIsImporting(false);
+        setPreviewDialogOpen(false);
+        return;
+    }
+
+    try {
+        await batch.commit();
+        toast({
+            title: "Import Complete",
+            description: `${importedCount} shops imported successfully.`,
+        });
+    } catch (error) {
+        toast({
+            title: "Import Error",
+            description: "An error occurred during the batch import.",
+            variant: "destructive"
+        });
+    } finally {
+        setIsImporting(false);
+        setPreviewDialogOpen(false);
+        setPreviewData([]);
+    }
+  }, [previewData, toast]);
 
 
   const openEditDialog = useCallback((client: Client) => {
@@ -403,6 +429,7 @@ function ShopDetailsPage() {
   })), []);
 
   const canManage = user?.role === 'Admin' || user?.role === 'Superadmin';
+  const readyToImportCount = useMemo(() => previewData.filter(row => row.status === 'Ready to Import').length, [previewData]);
 
   if (dataLoading) {
     return (
@@ -720,6 +747,52 @@ function ShopDetailsPage() {
             <DialogFooter>
                 <Button variant="ghost" onClick={() => setBulkStatusDialogOpen(false)}>Cancel</Button>
                 <Button onClick={handleBulkStatusChange} disabled={!newBulkStatus}>Apply Status</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    {/* CSV Preview Dialog */}
+    <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>CSV Import Preview</DialogTitle>
+                <DialogDescription>
+                    Review the data to be imported. Duplicates and rows with errors are automatically excluded.
+                </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="h-[60vh] rounded-md border">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Shop ID</TableHead>
+                            <TableHead>Client Name</TableHead>
+                            <TableHead>Agent</TableHead>
+                            <TableHead>Reason</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {previewData.map((row, index) => (
+                            <TableRow key={index}>
+                                <TableCell>
+                                    <Badge variant={row.status === 'Ready to Import' ? 'default' : 'destructive'}>
+                                        {row.status}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>{row.data.shopId}</TableCell>
+                                <TableCell>{row.data.clientName}</TableCell>
+                                <TableCell>{row.data.agent}</TableCell>
+                                <TableCell>{row.reason || 'N/A'}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
+            <DialogFooter>
+                <Button variant="ghost" onClick={() => setPreviewDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleConfirmImport} disabled={isImporting || readyToImportCount === 0}>
+                    {isImporting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Importing...</> : `Confirm Import (${readyToImportCount})`}
+                </Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>
