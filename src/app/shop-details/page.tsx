@@ -92,7 +92,7 @@ const formSchema = z.object({
 type ClientFormData = z.infer<typeof formSchema>;
 type PreviewRow = {
     data: any;
-    status: 'Ready to Import' | 'Duplicate ID' | 'Invalid Data' | 'Unknown Agent';
+    status: 'Ready to Import' | 'Duplicate ID' | 'Invalid Data';
     reason?: string;
 }
 
@@ -133,7 +133,8 @@ function ShopDetailsPage() {
     if (user.role === 'Admin' || user.role === 'Superadmin') {
       return allClients;
     }
-    return allClients.filter(c => c.agent === user.name);
+    // Case-insensitive comparison for agent's own clients
+    return allClients.filter(c => c.agent.toLowerCase() === user.name.toLowerCase());
   }, [allClients, user, dataLoading]);
 
   const form = useForm<ClientFormData>({
@@ -165,7 +166,7 @@ function ShopDetailsPage() {
             client.status.toLowerCase().includes(lowercasedTerm) ||
             (client.clientDetails && client.clientDetails.toLowerCase().includes(lowercasedTerm));
 
-        const matchesAgent = agentFilter === 'all' || client.agent === agentFilter;
+        const matchesAgent = agentFilter === 'all' || client.agent.toLowerCase() === agentFilter.toLowerCase();
         const matchesStatus = statusFilter === 'all' || client.status === statusFilter;
         
         const clientDate = client.kycCompletedDate;
@@ -322,7 +323,6 @@ function ShopDetailsPage() {
 
             const clientsData = results.data as any[];
             const existingShopIds = new Set(allClients.map(c => c.shopId));
-            const existingAgentNames = new Set(agents.map(a => a.name.toLowerCase()));
             
             const validatedData = clientsData.map(row => {
                 // Find keys case-insensitively
@@ -344,29 +344,26 @@ function ShopDetailsPage() {
                 if (!isValid(kycDate)) {
                     return { data: row, status: 'Invalid Data', reason: 'Invalid date format for kycCompletedDate.' };
                 }
-                const statusValue = getRowValue('status');
-                if (!clientStatus.includes(statusValue)) {
-                    return { data: row, status: 'Invalid Data', reason: `Status must be one of: ${clientStatus.join(', ')}` };
-                }
-
-                const agentName = getRowValue('agent');
-                if (!agentName || !existingAgentNames.has(agentName.toLowerCase())) {
-                    return { data: row, status: 'Unknown Agent', reason: `Agent '${agentName}' does not exist.` };
-                }
                 
-                const clientDetailsValue = getRowValue('clientDetails');
-                if (clientDetailsValue === undefined || clientDetailsValue === null) {
-                    return { data: row, status: 'Invalid Data', reason: 'clientDetails column is missing or empty.' };
+                const statusValueRaw = getRowValue('status');
+                let statusValue = statusValueRaw;
+                
+                const validStatus = clientStatus.find(s => statusValueRaw.toLowerCase().includes(s.toLowerCase()));
+
+                if (validStatus) {
+                    statusValue = validStatus;
+                } else {
+                     return { data: row, status: 'Invalid Data', reason: `Status must be one of: ${clientStatus.join(', ')}` };
                 }
 
 
                 const finalData = {
                     shopId: shopId,
                     clientName: getRowValue('clientName'),
-                    agent: agentName,
+                    agent: getRowValue('agent'),
                     kycCompletedDate: kycDate,
                     status: statusValue,
-                    clientDetails: clientDetailsValue || ''
+                    clientDetails: getRowValue('clientDetails') || ''
                 };
 
 
@@ -388,7 +385,7 @@ function ShopDetailsPage() {
     if(csvInputRef.current) {
         csvInputRef.current.value = "";
     }
-  }, [allClients, agents, toast]);
+  }, [allClients, toast]);
 
   const handleConfirmImport = useCallback(async () => {
     setIsImporting(true);
