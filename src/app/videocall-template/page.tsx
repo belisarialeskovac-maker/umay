@@ -199,20 +199,17 @@ export default function VideoCallTemplatePage() {
   }, []);
 
   const getFieldsToCheck = useCallback(() => {
-    let fieldsToCheck: (keyof FormData)[] = [...requiredFields]
+    let fieldsToCheck: (keyof FormData)[] = [...requiredFields];
     if (isAuthenticityCall) {
-      const modelOptional = sections.find(s => s.id === 'model')?.optionalFields ?? [];
-      const clientOptional = sections.find(s => s.id === 'client')?.optionalFields ?? [];
-      const optionalFieldsToExclude = [...modelOptional, ...clientOptional] as (keyof FormData)[];
-      fieldsToCheck = fieldsToCheck.filter(f => !optionalFieldsToExclude.includes(f));
+      fieldsToCheck = fieldsToCheck.filter(field => field !== 'clientweather');
     }
     return fieldsToCheck;
   }, [isAuthenticityCall]);
   
   const updateProgress = useCallback(() => {
     const fieldsToCheck = getFieldsToCheck();
-    const totalFields = fieldsToCheck.length
-    const filledFields = fieldsToCheck.filter((field) => formData[field as keyof FormData]?.trim() !== "").length
+    const totalFields = fieldsToCheck.length;
+    const filledFields = fieldsToCheck.filter((field) => formData[field as keyof FormData]?.trim() !== "").length;
     setProgress(totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0);
   }, [formData, getFieldsToCheck]);
 
@@ -246,7 +243,7 @@ export default function VideoCallTemplatePage() {
     }));
     toast({
         title: "Purpose Updated",
-        description: "The purpose of the call has been set to 'Authenticity'.",
+        description: "The purpose of the call has been set to 'Authenticity'. Some fields are now optional.",
     })
   }, [toast]);
 
@@ -258,7 +255,10 @@ export default function VideoCallTemplatePage() {
     
     if (isAuthenticityCall) {
         const optional = section.optionalFields as (keyof FormData)[];
-        required = required.filter(f => !optional.includes(f))
+        if(sectionId === 'client'){
+             optional.push('clientweather');
+        }
+        required = required.filter(f => !optional.includes(f));
     }
 
     return required.every((field) => formData[field]?.trim() !== "")
@@ -370,7 +370,7 @@ export default function VideoCallTemplatePage() {
       !isAuthenticityCall && { label: "Children Details:", value: formData["clientkid"] || "N/A" },
       { label: "Nickname:", value: formData["clientnickname"] || "N/A" },
       !isAuthenticityCall && { label: "Weekend Plans:", value: formData["clientweekend"] || "N/A" },
-      { label: "Weather and Time:", value: formData["clientweather"] || "N/A" },
+      !isAuthenticityCall && { label: "Weather and Time:", value: formData["clientweather"] || "N/A" },
     ].filter(Boolean) as { label: string; value: string }[];
     
     addSection("Client Details", clientData)
@@ -454,18 +454,23 @@ export default function VideoCallTemplatePage() {
     placeholder = "",
     helpText = "",
     tooltip = "",
-    hideForAuthenticity = false,
   ) => {
-    if (!isMounted) return null; // Don't render on the server
+    if (!isMounted) return null;
     const isCompleted = formData[name]?.trim() !== ""
-    if (isAuthenticityCall && hideForAuthenticity) return null
+    
+    let isActuallyRequired = required;
+    if (isAuthenticityCall) {
+        if (name === 'clientweather') {
+            isActuallyRequired = false;
+        }
+    }
 
     return (
       <div className="space-y-2">
         <div className="flex items-center">
           <label htmlFor={name} className="text-sm font-medium flex items-center gap-1">
             {label}
-            {required && <Badge variant="destructive" className="text-[10px] py-0">Required</Badge>}
+            {isActuallyRequired && <Badge variant="destructive" className="text-[10px] py-0">Required</Badge>}
             {tooltip && (
               <TooltipProvider>
                 <Tooltip>
@@ -480,7 +485,7 @@ export default function VideoCallTemplatePage() {
         </div>
         <div className="relative">
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{icon}</div>
-          <Input id={name} name={name} value={formData[name]} onChange={handleInputChange} className="pl-10" placeholder={placeholder} required={required} />
+          <Input id={name} name={name} value={formData[name]} onChange={handleInputChange} className="pl-10" placeholder={placeholder} required={isActuallyRequired} />
           {isCompleted && <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
         </div>
         {helpText && <p className="text-xs text-muted-foreground">{helpText}</p>}
@@ -496,7 +501,7 @@ export default function VideoCallTemplatePage() {
     placeholder = "",
     helpText = "",
   ) => {
-    if (!isMounted) return null; // Don't render on the server
+    if (!isMounted) return null;
     return(
         <div className="space-y-2 md:col-span-2">
             <label htmlFor="remarks" className="text-sm font-medium flex items-center gap-1">
@@ -588,16 +593,16 @@ export default function VideoCallTemplatePage() {
                             </div>
                             {renderFormField("fullName", "Full Name / Age", <User className="h-4 w-4" />, true, "E.g., Jane Smith / 30", "Format: Name / Age")}
                             {renderFormField("location", "Current Location", <MapPin className="h-4 w-4" />, true, "E.g., Makati (5 years)", "", "Include city/area and how many years you've lived there")}
-                            {renderFormField("previousLocation", "Previous Location", <History className="h-4 w-4" />, false, "E.g., Manila", "", "", true)}
+                            {!isAuthenticityCall && renderFormField("previousLocation", "Previous Location", <History className="h-4 w-4" />, false, "E.g., Manila")}
                             {renderFormField("work", "Occupation", <Briefcase className="h-4 w-4" />, true, "E.g., Executive Assistant")}
-                            {renderFormField("divorce", "Relationship Status", <Heart className="h-4 w-4" />, false, "E.g., Separated since 2022 (2 years)", "If applicable, include when and for how long", "", true)}
-                            {renderFormField("pet", "Pet Details", <PawPrint className="h-4 w-4" />, false, "E.g., Dog / Max / 3 years old", "Type, name, age (or 'None' if not applicable)", "", true)}
+                            {!isAuthenticityCall && renderFormField("divorce", "Relationship Status", <Heart className="h-4 w-4" />, false, "E.g., Separated since 2022 (2 years)", "If applicable, include when and for how long")}
+                            {!isAuthenticityCall && renderFormField("pet", "Pet Details", <PawPrint className="h-4 w-4" />, false, "E.g., Dog / Max / 3 years old", "Type, name, age (or 'None' if not applicable)")}
                             {renderFormField("kids", "Children Details", <Baby className="h-4 w-4" />, true, "E.g., Sofia / 8 / ABC School / Grade 3", "Names, ages, schools, grades (or 'NA' if not applicable)")}
-                            {renderFormField("weather", "Current Weather & Time", <CloudSun className="h-4 w-4" />, false, "E.g., Sunny, 3:45 PM", "", "", true)}
-                            {renderFormField("parents", "Parent Details", <Users className="h-4 w-4" />, false, "E.g., Mother (62, retired), Father (deceased)", "Just put N/A if not mentioned", "", true)}
-                            {renderFormField("plans", "Weekend Plans", <Calendar className="h-4 w-4" />, false, "E.g., Beach trip with friends", "", "", true)}
-                            {renderFormField("ethnicity", "Ethnicity", <Globe className="h-4 w-4" />, false, "E.g., Filipina Taiwanese", "", "", true)}
-                            {renderFormField("car", "Vehicle Details", <Car className="h-4 w-4" />, false, "E.g., Toyota Corolla 2020", "Make, model, year (or 'None' if not applicable)", "", true)}
+                            {!isAuthenticityCall && renderFormField("weather", "Current Weather & Time", <CloudSun className="h-4 w-4" />, false, "E.g., Sunny, 3:45 PM")}
+                            {!isAuthenticityCall && renderFormField("parents", "Parent Details", <Users className="h-4 w-4" />, false, "E.g., Mother (62, retired), Father (deceased)", "Just put N/A if not mentioned")}
+                            {!isAuthenticityCall && renderFormField("plans", "Weekend Plans", <Calendar className="h-4 w-4" />, false, "E.g., Beach trip with friends")}
+                            {!isAuthenticityCall && renderFormField("ethnicity", "Ethnicity", <Globe className="h-4 w-4" />, false, "E.g., Filipina Taiwanese")}
+                            {!isAuthenticityCall && renderFormField("car", "Vehicle Details", <Car className="h-4 w-4" />, false, "E.g., Toyota Corolla 2020", "Make, model, year (or 'None' if not applicable)")}
                         </div>
                         </CardContent>
                     )}
@@ -625,10 +630,10 @@ export default function VideoCallTemplatePage() {
                             {renderFormField("clientName", "Full Name and Age", <UserIcon className="h-4 w-4" />, true, "E.g., John Doe / 32")}
                             {renderFormField("clientLocation", "Location", <MapPin className="h-4 w-4" />, true, "E.g., New York")}
                             {renderFormField("clientWork", "Occupation", <Briefcase className="h-4 w-4" />, true, "E.g., Marketing Manager")}
-                            {renderFormField("hobbies", "Hobbies", <Hiking className="h-4 w-4" />, false, "E.g., Hiking, Travel", "Enter 'None' if not applicable", "", true)}
-                            {renderFormField("clientkid", "Children Details", <Baby className="h-4 w-4" />, false, "E.g., Lily / 3", "Names and ages (or 'None' if not applicable)", "", true)}
+                            {!isAuthenticityCall && renderFormField("hobbies", "Hobbies", <Hiking className="h-4 w-4" />, false, "E.g., Hiking, Travel", "Enter 'None' if not applicable")}
+                            {!isAuthenticityCall && renderFormField("clientkid", "Children Details", <Baby className="h-4 w-4" />, false, "E.g., Lily / 3", "Names and ages (or 'None' if not applicable)")}
                             {renderFormField("clientnickname", "Nickname", <Tag className="h-4 w-4" />, true, "E.g., Johnny", "Enter 'None' if not applicable")}
-                            {renderFormField("clientweekend", "Weekend Plans", <Calendar className="h-4 w-4" />, false, "E.g., Fishing trip", "Enter 'None' if not applicable", "", true)}
+                            {!isAuthenticityCall && renderFormField("clientweekend", "Weekend Plans", <Calendar className="h-4 w-4" />, false, "E.g., Fishing trip", "Enter 'None' if not applicable")}
                             {renderFormField("clientweather", "Weather and Time", <CloudRain className="h-4 w-4" />, true, "E.g., Rainy, 10:30 AM", "Based on client's location")}
                         </div>
                         </CardContent>
