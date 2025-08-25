@@ -1,6 +1,7 @@
 
 "use client"
 
+import React from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import type { AgentStats } from "../page"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +11,7 @@ type AgentStatisticsProps = {
   agentStats: AgentStats
 }
 
-export default function AgentStatistics({ agentStats }: AgentStatisticsProps) {
+function AgentStatistics({ agentStats }: AgentStatisticsProps) {
   const data = Object.entries(agentStats).map(([name, count]) => ({
     name,
     devices: count,
@@ -62,3 +63,5 @@ export default function AgentStatistics({ agentStats }: AgentStatisticsProps) {
 
   )
 }
+
+export default React.memo(AgentStatistics);

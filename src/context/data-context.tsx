@@ -150,8 +150,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (authLoading) {
-        setLoading(true);
-        return;
+        return; // Wait for auth to finish before doing anything
     };
     if (!user) {
         // If no user, clear data and stop loading

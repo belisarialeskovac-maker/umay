@@ -96,7 +96,6 @@ function TeamPerformancePage() {
   const { user, loading: authLoading } = useAuth();
   const { agents, teamPerformance: teamPerformanceDocs, absences, penalties, rewards, loading: dataLoading, dailyAddedClients, clients, deposits, withdrawals } = useData();
   
-  const [teamPerformance, setTeamPerformance] = useState<TeamPerformanceData[]>([])
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
   const [editedData, setEditedData] = useState<Partial<TeamPerformanceData>>({});
 
@@ -112,75 +111,66 @@ function TeamPerformancePage() {
 
   const displayAgents = useMemo(() => agents.filter(agent => agent.role !== 'Superadmin'), [agents]);
 
+  const teamPerformance = useMemo(() => {
+    return displayAgents.map(agent => {
+      const systemMetrics = {
+        addedToday: dailyAddedClients.filter(c => c.assignedAgent === agent.name && isToday(c.date)).length,
+        monthlyAdded: dailyAddedClients.filter(c => c.assignedAgent === agent.name && isThisMonth(c.date)).length,
+        openAccounts: clients.filter(c => c.agent === agent.name && isThisMonth(c.kycCompletedDate)).length,
+        totalDeposits: deposits.filter(d => d.agent === agent.name && isThisMonth(d.date)).reduce((sum, d) => sum + d.amount, 0),
+        totalWithdrawals: withdrawals.filter(w => w.agent === agent.name && isThisMonth(w.date)).reduce((sum, w) => sum + w.amount, 0),
+      };
 
-  useEffect(() => {
-    const calculatePerformanceMetrics = () => {
-        const performanceData = displayAgents.map(agent => {
-            const systemMetrics = {
-                addedToday: dailyAddedClients.filter(c => c.assignedAgent === agent.name && isToday(c.date)).length,
-                monthlyAdded: dailyAddedClients.filter(c => c.assignedAgent === agent.name && isThisMonth(c.date)).length,
-                openAccounts: clients.filter(c => c.agent === agent.name && isThisMonth(c.kycCompletedDate)).length,
-                totalDeposits: deposits.filter(d => d.agent === agent.name && isThisMonth(d.date)).reduce((sum, d) => sum + d.amount, 0),
-                totalWithdrawals: withdrawals.filter(w => w.agent === agent.name && isThisMonth(w.date)).reduce((sum, w) => sum + w.amount, 0),
-            };
-
-            const storedAgentData = teamPerformanceDocs[agent.name];
-            const isEdited = storedAgentData && storedAgentData.lastEditedBy !== 'System';
+      const storedAgentData = teamPerformanceDocs[agent.name];
+      const isEdited = storedAgentData && storedAgentData.lastEditedBy !== 'System';
             
-            return {
-                agentName: agent.name,
-                addedToday: isEdited ? storedAgentData.addedToday : systemMetrics.addedToday,
-                monthlyAdded: isEdited ? storedAgentData.monthlyAdded : systemMetrics.monthlyAdded,
-                openAccounts: isEdited ? storedAgentData.openAccounts : systemMetrics.openAccounts,
-                totalDeposits: isEdited ? storedAgentData.totalDeposits : systemMetrics.totalDeposits,
-                totalWithdrawals: isEdited ? storedAgentData.totalWithdrawals : systemMetrics.totalWithdrawals,
-                lastEditedBy: storedAgentData?.editor || "System",
-            };
-        });
+      return {
+        agentName: agent.name,
+        addedToday: isEdited ? storedAgentData.addedToday : systemMetrics.addedToday,
+        monthlyAdded: isEdited ? storedAgentData.monthlyAdded : systemMetrics.monthlyAdded,
+        openAccounts: isEdited ? storedAgentData.openAccounts : systemMetrics.openAccounts,
+        totalDeposits: isEdited ? storedAgentData.totalDeposits : systemMetrics.totalDeposits,
+        totalWithdrawals: isEdited ? storedAgentData.totalWithdrawals : systemMetrics.totalWithdrawals,
+        lastEditedBy: storedAgentData?.editor || "System",
+      };
+    });
+  }, [displayAgents, teamPerformanceDocs, dailyAddedClients, clients, deposits, withdrawals]);
 
-        setTeamPerformance(performanceData);
-    };
-
-    if (!dataLoading) {
-      calculatePerformanceMetrics();
-    }
-  }, [displayAgents, teamPerformanceDocs, dailyAddedClients, clients, deposits, withdrawals, dataLoading]);
-
-  const onAbsenceSubmit = async (values: z.infer<typeof absenceSchema>) => {
+  const onAbsenceSubmit = useCallback(async (values: z.infer<typeof absenceSchema>) => {
     await addDoc(collection(db, "absences"), values);
     toast({ title: "Absence Recorded", description: `Absence for ${values.agent} has been recorded.` })
     setAbsenceDialogOpen(false)
     absenceForm.reset({agent: '', remarks: '', date: new Date()})
-  }
+  }, [toast, absenceForm]);
 
-  const onPenaltySubmit = async (values: z.infer<typeof penaltySchema>) => {
+  const onPenaltySubmit = useCallback(async (values: z.infer<typeof penaltySchema>) => {
     await addDoc(collection(db, "penalties"), values);
     toast({ title: "Penalty Recorded", description: `Penalty for ${values.agent} has been recorded.` })
     setPenaltyDialogOpen(false)
     penaltyForm.reset({agent: '', remarks: '', amount: 0, date: new Date()})
-  }
+  }, [toast, penaltyForm]);
 
-  const onRewardSubmit = async (values: z.infer<typeof rewardSchema>) => {
+  const onRewardSubmit = useCallback(async (values: z.infer<typeof rewardSchema>) => {
     await addDoc(collection(db, "rewards"), values);
     toast({ title: "Reward Recorded", description: `Reward for ${values.agent} has been recorded.` })
     setRewardDialogOpen(false)
     rewardForm.reset({agent: '', remarks: '', status: 'Unclaimed', date: new Date()})
-  }
+  }, [toast, rewardForm]);
 
-  const handleEdit = (agentName: string) => {
+  const handleEdit = useCallback((agentName: string) => {
     setEditingAgent(agentName);
     const agentData = teamPerformance.find(p => p.agentName === agentName);
     if(agentData) {
         setEditedData(agentData);
     }
-  }
+  }, [teamPerformance]);
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     setEditingAgent(null);
     setEditedData({});
-  }
+  }, []);
   
-  const handleSave = async (agentName: string) => {
+  const handleSave = useCallback(async (agentName: string) => {
     if (!user) return;
     const perfDocRef = doc(db, 'teamPerformance', agentName);
     const dataToSave = { 
@@ -194,12 +184,12 @@ function TeamPerformancePage() {
     setEditingAgent(null);
     setEditedData({});
     toast({ title: "Performance Updated", description: `Data for ${agentName} has been saved.` });
-  }
+  }, [user, toast, editedData, teamPerformance]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: keyof TeamPerformanceData) => {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>, field: keyof TeamPerformanceData) => {
       const value = e.target.type === 'number' ? Number(e.target.value) : e.target.value;
       setEditedData(prev => ({...prev, [field]: value}));
-  }
+  }, []);
   
   if (dataLoading) {
     return (
@@ -603,5 +593,3 @@ function TeamPerformancePage() {
 
 
 export default withAuth(TeamPerformancePage, ['Admin', 'Superadmin']);
-
-    

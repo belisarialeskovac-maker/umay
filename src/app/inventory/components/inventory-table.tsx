@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 import {
   Table,
   TableBody,
@@ -68,7 +68,7 @@ const editFormSchema = z.object({
   remarks: z.string().optional(),
 })
 
-export default function InventoryTable({
+function InventoryTable({
   devices,
   onDelete,
   onUpdate,
@@ -330,3 +330,5 @@ export default function InventoryTable({
     </>
   )
 }
+
+export default React.memo(InventoryTable);

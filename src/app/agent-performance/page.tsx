@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -104,7 +104,7 @@ type AgentFormData = z.infer<typeof formSchema>
 
 
 function AgentPerformancePage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { agents, clients, deposits, withdrawals, inventory, orders, absences, penalties, rewards, loading: dataLoading } = useData();
 
   const [open, setOpen] = useState(false)
@@ -115,15 +115,6 @@ function AgentPerformancePage() {
   const { toast } = useToast()
   
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
-  
-  const [agentClients, setAgentClients] = useState<Client[]>([]);
-  const [agentDeposits, setAgentDeposits] = useState<Transaction[]>([]);
-  const [agentWithdrawals, setAgentWithdrawals] = useState<Transaction[]>([]);
-  const [agentInventory, setAgentInventory] = useState<Inventory[]>([]);
-  const [agentOrders, setAgentOrders] = useState<Order[]>([]);
-  const [agentAbsences, setAgentAbsences] = useState<Absence[]>([]);
-  const [agentPenalties, setAgentPenalties] = useState<Penalty[]>([]);
-  const [agentRewards, setAgentRewards] = useState<Reward[]>([]);
   const auth = getAuth(app);
 
 
@@ -141,23 +132,24 @@ function AgentPerformancePage() {
     resolver: zodResolver(formSchema),
   });
 
-  const displayAgents = agents.filter(agent => agent.role !== 'Superadmin');
+  const displayAgents = useMemo(() => agents.filter(agent => agent.role !== 'Superadmin'), [agents]);
 
-  useEffect(() => {
-    if (selectedAgent) {
-        setAgentClients(clients.filter(c => c.agent === selectedAgent.name));
-        setAgentDeposits(deposits.filter(d => d.agent === selectedAgent.name));
-        setAgentWithdrawals(withdrawals.filter(w => w.agent === selectedAgent.name));
-        setAgentInventory(inventory.filter(i => i.agent === selectedAgent.name));
-        setAgentOrders(orders.filter(o => o.agent === selectedAgent.name));
-        setAgentAbsences(absences.filter(a => a.agent === selectedAgent.name));
-        setAgentPenalties(penalties.filter(p => p.agent === selectedAgent.name));
-        setAgentRewards(rewards.filter(r => r.agent === selectedAgent.name));
-    }
+  const agentData = useMemo(() => {
+    if (!selectedAgent) return null;
+    return {
+        clients: clients.filter(c => c.agent === selectedAgent.name),
+        deposits: deposits.filter(d => d.agent === selectedAgent.name),
+        withdrawals: withdrawals.filter(w => w.agent === selectedAgent.name),
+        inventory: inventory.filter(i => i.agent === selectedAgent.name),
+        orders: orders.filter(o => o.agent === selectedAgent.name),
+        absences: absences.filter(a => a.agent === selectedAgent.name),
+        penalties: penalties.filter(p => p.agent === selectedAgent.name),
+        rewards: rewards.filter(r => r.agent === selectedAgent.name),
+    };
   }, [selectedAgent, clients, deposits, withdrawals, inventory, orders, absences, penalties, rewards]);
 
 
-  async function onSubmit(values: AgentFormData) {
+  const onSubmit = useCallback(async (values: AgentFormData) => {
     if(!values.password) {
         form.setError("password", {type: 'manual', message: "Password is required for new agents."})
         return;
@@ -196,9 +188,9 @@ function AgentPerformancePage() {
         variant: "destructive"
       })
     }
-  }
+  }, [auth, form, toast]);
 
-  async function onEditSubmit(values: AgentFormData) {
+  const onEditSubmit = useCallback(async (values: AgentFormData) => {
     if (!agentToEdit) return;
     try {
       const agentRef = doc(db, "agents", agentToEdit.uid);
@@ -210,9 +202,9 @@ function AgentPerformancePage() {
     } catch(error: any) {
         toast({ title: "Error", description: error.message || "Failed to update agent.", variant: "destructive" });
     }
-  }
+  }, [agentToEdit, editForm, toast]);
   
-  const handleUpdateStatus = async (agent: Agent, newStatus: "Active" | "Rejected") => {
+  const handleUpdateStatus = useCallback(async (agent: Agent, newStatus: "Active" | "Rejected") => {
     try {
         const agentRef = doc(db, "agents", agent.uid);
         await updateDoc(agentRef, { status: newStatus });
@@ -223,10 +215,10 @@ function AgentPerformancePage() {
     } catch (error: any) {
          toast({ title: "Error", description: error.message || "Failed to update agent status.", variant: "destructive" });
     }
-  }
+  }, [toast]);
 
 
-  const handleDeleteAgent = async () => {
+  const handleDeleteAgent = useCallback(async () => {
     if (!agentToDelete) return;
     try {
         // We need a flow to delete the user from Auth. For now, we only delete from Firestore.
@@ -241,23 +233,23 @@ function AgentPerformancePage() {
     }
     setDeleteAlertOpen(false);
     setAgentToDelete(null);
-  }
+  }, [agentToDelete, toast]);
 
-  const openEditDialog = (agent: Agent) => {
+  const openEditDialog = useCallback((agent: Agent) => {
     setAgentToEdit(agent);
     editForm.reset({
         ...agent,
         dateHired: agent.dateHired
     });
     setEditOpen(true);
-  }
+  }, [editForm]);
   
-  const openDeleteDialog = (agent: Agent) => {
+  const openDeleteDialog = useCallback((agent: Agent) => {
     setAgentToDelete(agent);
     setDeleteAlertOpen(true);
-  }
+  }, []);
   
-  const handleRowClick = (agent: Agent) => {
+  const handleRowClick = useCallback((agent: Agent) => {
     if(agent.status !== 'Active') {
         toast({
             title: "Account Not Active",
@@ -267,11 +259,11 @@ function AgentPerformancePage() {
         return;
     }
     setSelectedAgent(agent);
-  }
+  }, [toast]);
 
-  const handleCloseDetails = () => {
+  const handleCloseDetails = useCallback(() => {
     setSelectedAgent(null);
-  }
+  }, []);
   
   const canRegisterAgent = user?.role === 'Admin' || user?.role === 'Superadmin';
   
@@ -457,7 +449,7 @@ function AgentPerformancePage() {
         )}
       </div>
 
-      {selectedAgent ? (
+      {selectedAgent && agentData ? (
         <Card>
             <CardHeader>
                 <div className="flex justify-between items-start">
@@ -485,19 +477,19 @@ function AgentPerformancePage() {
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                             <Card>
                                 <CardHeader><CardTitle>Clients</CardTitle></CardHeader>
-                                <CardContent><div className="text-2xl font-bold">{agentClients.length}</div></CardContent>
+                                <CardContent><div className="text-2xl font-bold">{agentData.clients.length}</div></CardContent>
                             </Card>
                             <Card>
                                 <CardHeader><CardTitle>Total Deposits</CardTitle></CardHeader>
-                                <CardContent><div className="text-2xl font-bold">${agentDeposits.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}</div></CardContent>
+                                <CardContent><div className="text-2xl font-bold">${agentData.deposits.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}</div></CardContent>
                             </Card>
                              <Card>
                                 <CardHeader><CardTitle>Total Withdrawals</CardTitle></CardHeader>
-                                <CardContent><div className="text-2xl font-bold">${agentWithdrawals.reduce((sum, w) => sum + w.amount, 0).toFixed(2)}</div></CardContent>
+                                <CardContent><div className="text-2xl font-bold">${agentData.withdrawals.reduce((sum, w) => sum + w.amount, 0).toFixed(2)}</div></CardContent>
                             </Card>
                              <Card>
                                 <CardHeader><CardTitle>Devices Held</CardTitle></CardHeader>
-                                <CardContent><div className="text-2xl font-bold">{agentInventory.length}</div></CardContent>
+                                <CardContent><div className="text-2xl font-bold">{agentData.inventory.length}</div></CardContent>
                             </Card>
                         </div>
                     </TabsContent>
@@ -505,7 +497,7 @@ function AgentPerformancePage() {
                         <Table>
                             <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client Name</TableHead><TableHead>KYC Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {agentClients.length > 0 ? agentClients.map(c => (
+                                {agentData.clients.length > 0 ? agentData.clients.map(c => (
                                     <TableRow key={c.id}><TableCell>{c.shopId}</TableCell><TableCell>{c.clientName}</TableCell><TableCell>{format(c.kycCompletedDate, "PPP")}</TableCell><TableCell><Badge variant={c.status === 'Active' ? 'default' : c.status === 'In Process' ? 'secondary' : 'destructive'}>{c.status}</Badge></TableCell></TableRow>
                                 )) : <TableRow><TableCell colSpan={4} className="text-center">No clients found for this agent.</TableCell></TableRow>}
                             </TableBody>
@@ -518,7 +510,7 @@ function AgentPerformancePage() {
                                 <Table>
                                      <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead>Amount</TableHead></TableRow></TableHeader>
                                      <TableBody>
-                                        {agentDeposits.length > 0 ? agentDeposits.map((d,i) => (
+                                        {agentData.deposits.length > 0 ? agentData.deposits.map((d,i) => (
                                             <TableRow key={d.id}><TableCell>{d.shopId}</TableCell><TableCell>{d.clientName}</TableCell><TableCell>{format(d.date, "PPP")}</TableCell><TableCell>${d.amount.toFixed(2)}</TableCell></TableRow>
                                         )) : <TableRow><TableCell colSpan={4} className="text-center">No deposits found.</TableCell></TableRow>}
                                     </TableBody>
@@ -529,7 +521,7 @@ function AgentPerformancePage() {
                                 <Table>
                                      <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead>Amount</TableHead></TableRow></TableHeader>
                                      <TableBody>
-                                        {agentWithdrawals.length > 0 ? agentWithdrawals.map((w,i) => (
+                                        {agentData.withdrawals.length > 0 ? agentData.withdrawals.map((w,i) => (
                                             <TableRow key={w.id}><TableCell>{w.shopId}</TableCell><TableCell>{w.clientName}</TableCell><TableCell>{format(w.date, "PPP")}</TableCell><TableCell>${w.amount.toFixed(2)}</TableCell></TableRow>
                                         )) : <TableRow><TableCell colSpan={4} className="text-center">No withdrawals found.</TableCell></TableRow>}
                                     </TableBody>
@@ -541,7 +533,7 @@ function AgentPerformancePage() {
                          <Table>
                             <TableHeader><TableRow><TableHead>IMEI</TableHead><TableHead>Model</TableHead><TableHead>Color</TableHead><TableHead>Last Updated</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {agentInventory.length > 0 ? agentInventory.map(d => (
+                                {agentData.inventory.length > 0 ? agentData.inventory.map(d => (
                                     <TableRow key={d.id}><TableCell>{d.imei}</TableCell><TableCell>{d.model}</TableCell><TableCell>{d.color}</TableCell><TableCell>{format(new Date(d.updatedAt), "PPP p")}</TableCell></TableRow>
                                 )) : <TableRow><TableCell colSpan={4} className="text-center">No devices found for this agent.</TableCell></TableRow>}
                             </TableBody>
@@ -551,7 +543,7 @@ function AgentPerformancePage() {
                          <Table>
                             <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Location</TableHead><TableHead>Price</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {agentOrders.length > 0 ? agentOrders.map(o => (
+                                {agentData.orders.length > 0 ? agentData.orders.map(o => (
                                     <TableRow key={o.id}><TableCell>{o.shopId}</TableCell><TableCell>{o.location}</TableCell><TableCell>${o.price.toFixed(2)}</TableCell><TableCell><Badge variant={o.status === 'Approved' ? 'default' : o.status === 'Pending' ? 'secondary' : 'destructive'}>{o.status}</Badge></TableCell></TableRow>
                                 )) : <TableRow><TableCell colSpan={4} className="text-center">No orders found for this agent.</TableCell></TableRow>}
                             </TableBody>
@@ -564,7 +556,7 @@ function AgentPerformancePage() {
                                 <Table>
                                     <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Remarks</TableHead></TableRow></TableHeader>
                                     <TableBody>
-                                        {agentAbsences.length > 0 ? agentAbsences.map((a,i) => (
+                                        {agentData.absences.length > 0 ? agentData.absences.map((a,i) => (
                                             <TableRow key={a.id}><TableCell>{format(a.date, "PPP")}</TableCell><TableCell>{a.remarks}</TableCell></TableRow>
                                         )) : <TableRow><TableCell colSpan={2} className="text-center">No absences found.</TableCell></TableRow>}
                                     </TableBody>
@@ -575,7 +567,7 @@ function AgentPerformancePage() {
                                 <Table>
                                     <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Remarks</TableHead><TableHead>Amount</TableHead></TableRow></TableHeader>
                                     <TableBody>
-                                        {agentPenalties.length > 0 ? agentPenalties.map((p,i) => (
+                                        {agentData.penalties.length > 0 ? agentData.penalties.map((p,i) => (
                                             <TableRow key={p.id}><TableCell>{format(p.date, "PPP")}</TableCell><TableCell>{p.remarks}</TableCell><TableCell>${p.amount.toFixed(2)}</TableCell></TableRow>
                                         )) : <TableRow><TableCell colSpan={3} className="text-center">No penalties found.</TableCell></TableRow>}
                                     </TableBody>
@@ -587,7 +579,7 @@ function AgentPerformancePage() {
                         <Table>
                             <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Remarks</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {agentRewards.length > 0 ? agentRewards.map((r,i) => (
+                                {agentData.rewards.length > 0 ? agentData.rewards.map((r,i) => (
                                     <TableRow key={r.id}><TableCell>{format(r.date, "PPP")}</TableCell><TableCell>{r.remarks}</TableCell><TableCell><Badge variant={r.status === 'Claimed' ? 'secondary' : 'default'}>{r.status}</Badge></TableCell></TableRow>
                                 )) : <TableRow><TableCell colSpan={3} className="text-center">No rewards found for this agent.</TableCell></TableRow>}
                             </TableBody>
