@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, ArrowDownToLine, ArrowUpFromLine, Loader2, Trophy, Store, UserPlus, Medal } from "lucide-react";
+import { Users, ArrowDownToLine, ArrowUpFromLine, Loader2, Trophy, Store, UserPlus, Crown, Award } from "lucide-react";
 import { format, getMonth, getYear, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import withAuth from '@/components/with-auth';
 import { useAuth } from '@/context/auth-context';
@@ -53,8 +53,12 @@ function Home() {
     const isAllTime = selectedYear === 'all';
 
     const getInterval = () => {
-        if (isAllTime || selectedMonth === 'all') {
-            return { start: new Date(0), end: new Date() };
+        if (isAllTime) {
+            // A very large interval to effectively capture all time
+            return { start: new Date(0), end: new Date(8640000000000000) };
+        }
+        if (selectedMonth === 'all' && typeof selectedYear === 'number') {
+            return { start: new Date(selectedYear, 0, 1), end: new Date(selectedYear, 11, 31, 23, 59, 59) };
         }
         const year = typeof selectedYear === 'number' ? selectedYear : getYear(new Date());
         const month = typeof selectedMonth === 'number' ? selectedMonth : getMonth(new Date());
@@ -64,12 +68,8 @@ function Home() {
     };
 
     const interval = getInterval();
-
+    
     const filterByInterval = (items: any[], dateField: string) => {
-        if (isAllTime) return items;
-        if (selectedMonth === 'all' && typeof selectedYear === 'number') {
-            return items.filter(item => getYear(item[dateField]) === selectedYear);
-        }
         return items.filter(item => isWithinInterval(item[dateField], interval));
     };
 
@@ -128,11 +128,11 @@ function Home() {
   };
   
   const getFilterLabel = () => {
-    if (selectedYear === 'all') return 'All time';
+    if (selectedYear === 'all') return 'All Time';
     
     const yearLabel = selectedYear;
     const monthLabel = selectedMonth === 'all' 
-        ? 'the entire year' 
+        ? 'the entire year of' 
         : months.find(m => m.value === selectedMonth)?.label;
         
     return `${monthLabel} ${yearLabel}`;
@@ -147,52 +147,86 @@ function Home() {
     );
   }
 
-  const renderLeaderboard = (title: string, data: LeaderboardEntry[], isCurrency = false, icon: React.ReactNode) => {
-      const getMedalColor = (rank: number) => {
-        if (rank === 0) return "text-yellow-500"; // Gold
-        if (rank === 1) return "text-gray-400";  // Silver
-        if (rank === 2) return "text-yellow-700"; // Bronze
-        return "text-muted-foreground";
+ const renderLeaderboard = (title: string, data: LeaderboardEntry[], isCurrency = false, icon: React.ReactNode, iconBgClass: string) => {
+    const getRankComponent = (rank: number) => {
+        const rankClasses = "h-6 w-6";
+        if (rank === 0) return <div className={cn("flex items-center justify-center font-bold text-lg rounded-full h-8 w-8", "bg-yellow-400/20 text-yellow-500")}>1</div>;
+        if (rank === 1) return <div className={cn("flex items-center justify-center font-bold text-lg rounded-full h-8 w-8", "bg-gray-400/20 text-gray-500")}>2</div>;
+        if (rank === 2) return <div className={cn("flex items-center justify-center font-bold text-lg rounded-full h-8 w-8", "bg-yellow-600/20 text-yellow-700")}>3</div>;
+        return <div className="text-muted-foreground w-8 text-center">{rank + 1}</div>;
     };
     
     return (
-        <Card>
+        <Card className="hover:shadow-lg transition-shadow duration-300">
         <CardHeader>
-            <CardTitle className="flex items-center gap-2">{icon} {title}</CardTitle>
+            <div className="flex items-center gap-3">
+                <div className={cn("p-3 rounded-full", iconBgClass)}>
+                    {icon}
+                </div>
+                <CardTitle>{title}</CardTitle>
+            </div>
         </CardHeader>
         <CardContent>
             <Table>
-            <TableHeader>
-                <TableRow>
-                <TableHead className="w-[50px]">Rank</TableHead>
-                <TableHead>Agent</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {data.map((entry, index) => (
-                <TableRow key={index} className={cn(index < 3 && "bg-accent/50")}>
-                    <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                           {index < 3 ? <Medal className={cn("h-5 w-5", getMedalColor(index))} /> : <span className="w-5 text-center">{index + 1}</span>}
-                        </div>
-                    </TableCell>
-                    <TableCell>{entry.agentName}</TableCell>
-                    <TableCell className="text-right">{isCurrency ? `$${entry.value.toFixed(2)}` : entry.value}</TableCell>
-                </TableRow>
-                ))}
-            </TableBody>
+                <TableHeader>
+                    <TableRow>
+                    <TableHead className="w-[50px]">Rank</TableHead>
+                    <TableHead>Agent</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {data.length > 0 ? data.map((entry, index) => (
+                    <TableRow key={index} className="hover:bg-accent/50 transition-colors">
+                        <TableCell className="font-bold">{getRankComponent(index)}</TableCell>
+                        <TableCell className="font-medium">{entry.agentName}</TableCell>
+                        <TableCell className="text-right font-semibold">{isCurrency ? `$${entry.value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : entry.value}</TableCell>
+                    </TableRow>
+                    )) : (
+                    <TableRow><TableCell colSpan={3} className="text-center h-24 text-muted-foreground">No data for this period.</TableCell></TableRow>
+                    )}
+                </TableBody>
             </Table>
         </CardContent>
         </Card>
   )};
 
+  const renderTopPerformerCard = (title: string, data: LeaderboardEntry[], isCurrency = false, icon: React.ReactNode) => {
+    const topPerformer = data[0];
+    if (!topPerformer || topPerformer.value === 0) {
+        return (
+             <Card className="bg-muted/30">
+                <CardHeader>
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">{icon} {title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-center text-muted-foreground py-4">No top performer this period.</p>
+                </CardContent>
+            </Card>
+        );
+    }
+    return (
+        <Card className="relative overflow-hidden bg-gradient-to-br from-primary/10 to-background hover:shadow-xl transition-shadow duration-300">
+            <div className="absolute top-0 right-0 p-2 bg-primary/80 text-primary-foreground text-xs font-bold rounded-bl-lg">TOP PERFORMER</div>
+            <CardHeader>
+                <CardTitle className="text-lg font-bold flex items-center gap-2">{icon} {title}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+                <p className="text-2xl font-bold text-primary">{topPerformer.agentName}</p>
+                <p className="text-4xl font-extrabold text-foreground mt-2">
+                    {isCurrency ? `$${topPerformer.value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : topPerformer.value}
+                </p>
+            </CardContent>
+        </Card>
+    );
+  }
+
   return (
-    <div className="w-full h-full space-y-6">
+    <div className="w-full h-full space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div className="mb-4 sm:mb-0">
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">An overview of your workspace for {getFilterLabel()}.</p>
+          <h1 className="text-4xl font-bold text-foreground tracking-tight">Performance Arena</h1>
+          <p className="text-muted-foreground mt-1">An overview of agent performance for <span className="font-semibold text-primary">{getFilterLabel()}</span>.</p>
         </div>
         <div className="flex gap-2">
           <Select value={String(selectedMonth)} onValueChange={handleMonthChange} disabled={selectedYear === 'all'}>
@@ -211,7 +245,7 @@ function Home() {
               <SelectValue placeholder="Select year" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All time</SelectItem>
+              <SelectItem value="all">All Time</SelectItem>
               {availableYears.map(year => (
                 <SelectItem key={year} value={String(year)}>{year}</SelectItem>
               ))}
@@ -220,45 +254,18 @@ function Home() {
         </div>
       </div>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">New Shops</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.clients}</div>
-            <p className="text-xs text-muted-foreground">New shops for selected period</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Deposits</CardTitle>
-            <ArrowDownToLine className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${stats.deposits.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Total deposits for selected period</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Withdrawals</CardTitle>
-            <ArrowUpFromLine className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${stats.withdrawals.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Total withdrawals for selected period</p>
-          </CardContent>
-        </Card>
+       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {renderTopPerformerCard("Top Deposits", topDeposits, true, <Trophy className="text-yellow-500" />)}
+        {renderTopPerformerCard("Top Shops Opened", topShops, false, <Store className="text-blue-500" />)}
+        {renderTopPerformerCard("Top Clients Added", topClientsAdded, false, <UserPlus className="text-green-500" />)}
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-4">Performance Leaderboards</h2>
-        <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
-          {renderLeaderboard("Top 10 Agent Deposits", topDeposits, true, <Trophy className="text-yellow-500" />)}
-          {renderLeaderboard("Top 10 Shop Open", topShops, false, <Store className="text-blue-500" />)}
-          {renderLeaderboard("Top 10 Client Added", topClientsAdded, false, <UserPlus className="text-green-500" />)}
+        <h2 className="text-3xl font-bold text-foreground mb-4">Leaderboards</h2>
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+          {renderLeaderboard("Top 10 Agent Deposits", topDeposits, true, <Trophy className="text-yellow-500" />, "bg-yellow-500/10")}
+          {renderLeaderboard("Top 10 Shops Opened", topShops, false, <Store className="text-blue-500" />, "bg-blue-500/10")}
+          {renderLeaderboard("Top 10 Clients Added", topClientsAdded, false, <UserPlus className="text-green-500" />, "bg-green-500/10")}
         </div>
       </div>
 
