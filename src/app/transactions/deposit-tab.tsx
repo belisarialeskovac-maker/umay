@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -183,7 +183,7 @@ export default function DepositTab() {
     }
   }, [watchedEditShopId, clients, editForm, depositToEdit]);
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  const onSubmit = useCallback(async (values: z.infer<typeof formSchema>) => {
     try {
       await addDoc(collection(db, "deposits"), values);
       toast({
@@ -207,9 +207,9 @@ export default function DepositTab() {
         variant: "destructive"
       });
     }
-  }
+  }, [form, toast]);
 
-  async function onEditSubmit(values: z.infer<typeof formSchema>) {
+  const onEditSubmit = useCallback(async (values: z.infer<typeof formSchema>) => {
     if (!depositToEdit) return;
     try {
         const depositRef = doc(db, "deposits", depositToEdit.id);
@@ -219,9 +219,9 @@ export default function DepositTab() {
     } catch(error: any) {
         toast({ title: "Error", description: error.message || "Failed to update deposit.", variant: "destructive" });
     }
-  }
+  }, [depositToEdit, toast]);
 
-  const handleDeleteDeposit = async () => {
+  const handleDeleteDeposit = useCallback(async () => {
     if (!depositToDelete) return;
     try {
         await deleteDoc(doc(db, "deposits", depositToDelete.id));
@@ -235,31 +235,31 @@ export default function DepositTab() {
     }
     setDeleteAlertOpen(false);
     setDepositToDelete(null);
-  }
+  }, [depositToDelete, toast]);
   
-  const openEditDialog = (deposit: Deposit) => {
+  const openEditDialog = useCallback((deposit: Deposit) => {
     setDepositToEdit(deposit);
     editForm.reset({
         ...deposit,
         date: deposit.date
     });
     setEditOpen(true);
-  }
+  }, [editForm]);
   
-  const openDeleteDialog = (deposit: Deposit) => {
+  const openDeleteDialog = useCallback((deposit: Deposit) => {
     setDepositToDelete(deposit);
     setDeleteAlertOpen(true);
-  }
+  }, []);
 
   const availableYears = useMemo(() => {
     const years = new Set(deposits.map(d => getYear(d.date)));
     return Array.from(years).sort((a,b) => b - a);
   }, [deposits]);
   
-  const months = Array.from({ length: 12 }, (_, i) => ({
+  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
     value: i,
     label: format(new Date(0, i), 'MMMM'),
-  }));
+  })), []);
 
   const clientFound = !!watchedShopId && clients.some(c => c.shopId === watchedShopId);
   const clientFoundEdit = !!watchedEditShopId && clients.some(c => c.shopId === watchedEditShopId);

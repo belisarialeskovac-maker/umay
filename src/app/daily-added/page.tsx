@@ -59,41 +59,42 @@ function DailyAddedPage() {
     }
   }, [user, dailyAddedClients, dataLoading]);
 
-  const calculateStats = useCallback((clientsToProcess: Client[], currentAgents: Agent[]) => {
-    const daily = clientsToProcess.filter(c => isToday(new Date(c.date)));
-    const monthly = clientsToProcess.filter(c => isThisMonth(new Date(c.date)));
-
-    setDailyCount(daily.length);
-    setMonthlyCount(monthly.length);
-    setTotalCount(clientsToProcess.length);
-
-    const stats: AgentStats = {};
-
-    currentAgents.forEach(agent => {
-        stats[agent.name] = { daily: 0, monthly: 0 };
-    });
-
-    clientsToProcess.forEach(client => {
-        if(stats[client.assignedAgent]) {
-            if (isToday(new Date(client.date))) {
-                stats[client.assignedAgent].daily++;
-            }
-            if (isThisMonth(new Date(client.date))) {
-                stats[client.assignedAgent].monthly++;
-            }
-        }
-    });
-
-    setAgentStats(stats);
-  }, []);
-
-  useEffect(() => {
+  const calculateStats = useCallback(() => {
     if (!dataLoading && user) {
         // For admins, calculate stats on all clients, for agents, on their own.
         const statsSource = user.role === 'Agent' ? visibleClients : dailyAddedClients;
-        calculateStats(statsSource, agents);
+        
+        const daily = statsSource.filter(c => isToday(new Date(c.date)));
+        const monthly = statsSource.filter(c => isThisMonth(new Date(c.date)));
+
+        setDailyCount(daily.length);
+        setMonthlyCount(monthly.length);
+        setTotalCount(statsSource.length);
+
+        const stats: AgentStats = {};
+
+        agents.forEach(agent => {
+            stats[agent.name] = { daily: 0, monthly: 0 };
+        });
+
+        statsSource.forEach(client => {
+            if(stats[client.assignedAgent]) {
+                if (isToday(new Date(client.date))) {
+                    stats[client.assignedAgent].daily++;
+                }
+                if (isThisMonth(new Date(client.date))) {
+                    stats[client.assignedAgent].monthly++;
+                }
+            }
+        });
+
+        setAgentStats(stats);
     }
-  }, [dailyAddedClients, agents, dataLoading, calculateStats, user, visibleClients]);
+  }, [dataLoading, user, visibleClients, dailyAddedClients, agents]);
+
+  useEffect(() => {
+    calculateStats();
+  }, [calculateStats]);
 
   const ageData = useMemo(() => {
     const ageGroups = {
@@ -382,3 +383,5 @@ function DailyAddedPage() {
 }
 
 export default withAuth(DailyAddedPage, ['Agent', 'Admin', 'Superadmin']);
+
+    

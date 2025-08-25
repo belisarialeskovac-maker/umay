@@ -134,7 +134,7 @@ function TeamPerformancePage() {
         lastEditedBy: storedAgentData?.editor || "System",
       };
     });
-  }, [displayAgents, teamPerformanceDocs, dailyAddedClients, clients, deposits, withdrawals]);
+  }, [displayAgents, dailyAddedClients, clients, deposits, withdrawals, teamPerformanceDocs]);
 
   const onAbsenceSubmit = useCallback(async (values: z.infer<typeof absenceSchema>) => {
     await addDoc(collection(db, "absences"), values);
@@ -593,3 +593,5 @@ function TeamPerformancePage() {
 
 
 export default withAuth(TeamPerformancePage, ['Admin', 'Superadmin']);
+
+    

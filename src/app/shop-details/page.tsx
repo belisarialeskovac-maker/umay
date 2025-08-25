@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -164,7 +164,7 @@ function ShopDetailsPage() {
     setSelectedClients([]); // Clear selections on filter change
   }, [searchTerm, agentFilter, monthFilter, yearFilter]);
 
-  async function onSubmit(values: ClientFormData) {
+  const onSubmit = useCallback(async (values: ClientFormData) => {
     try {
       // Check for unique shopId
       const q = query(collection(db, "clients"), where("shopId", "==", values.shopId));
@@ -193,9 +193,9 @@ function ShopDetailsPage() {
         variant: "destructive"
       });
     }
-  }
+  }, [form, toast]);
 
-  async function onEditSubmit(values: ClientFormData) {
+  const onEditSubmit = useCallback(async (values: ClientFormData) => {
     if (!clientToEdit) return;
     try {
         // Check for unique shopId if it has changed
@@ -218,9 +218,9 @@ function ShopDetailsPage() {
     } catch(error: any) {
         toast({ title: "Error", description: error.message || "Failed to update shop.", variant: "destructive" });
     }
-  }
+  }, [clientToEdit, toast]);
 
-  const handleDeleteClient = async () => {
+  const handleDeleteClient = useCallback(async () => {
     if (!clientToDelete) return;
     try {
         await deleteDoc(doc(db, "clients", clientToDelete.id));
@@ -234,9 +234,9 @@ function ShopDetailsPage() {
     }
     setDeleteAlertOpen(false);
     setClientToDelete(null);
-  }
+  }, [clientToDelete, toast]);
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = useCallback(async () => {
     const batch = writeBatch(db);
     selectedClients.forEach(id => {
       batch.delete(doc(db, "clients", id));
@@ -249,9 +249,9 @@ function ShopDetailsPage() {
       toast({ title: "Error", description: "Failed to delete selected shops.", variant: "destructive" });
     }
     setBulkDeleteAlertOpen(false);
-  }
+  }, [selectedClients, toast]);
   
-  const handleBulkStatusChange = async () => {
+  const handleBulkStatusChange = useCallback(async () => {
     if (!newBulkStatus) {
       toast({ title: "No Status Selected", description: "Please select a status to apply.", variant: "destructive" });
       return;
@@ -269,47 +269,47 @@ function ShopDetailsPage() {
     }
     setBulkStatusDialogOpen(false);
     setNewBulkStatus('');
-  }
+  }, [selectedClients, newBulkStatus, toast]);
 
-  const openEditDialog = (client: Client) => {
+  const openEditDialog = useCallback((client: Client) => {
     setClientToEdit(client);
     editForm.reset({
         ...client,
         kycCompletedDate: client.kycCompletedDate
     });
     setEditOpen(true);
-  }
+  }, [editForm]);
   
-  const openDeleteDialog = (client: Client) => {
+  const openDeleteDialog = useCallback((client: Client) => {
     setClientToDelete(client);
     setDeleteAlertOpen(true);
-  }
+  }, []);
 
-  const handleSelectAll = (checked: boolean) => {
+  const handleSelectAll = useCallback((checked: boolean) => {
     if(checked) {
         setSelectedClients(paginatedClients.map(c => c.id));
     } else {
         setSelectedClients([]);
     }
-  }
+  }, [paginatedClients]);
 
-  const handleSelectClient = (clientId: string, checked: boolean) => {
+  const handleSelectClient = useCallback((clientId: string, checked: boolean) => {
     if(checked) {
         setSelectedClients(prev => [...prev, clientId]);
     } else {
         setSelectedClients(prev => prev.filter(id => id !== clientId));
     }
-  }
+  }, []);
 
   const availableYears = useMemo(() => {
     const years = new Set(clients.map(c => getYear(c.kycCompletedDate)));
     return Array.from(years).sort((a,b) => b - a);
   }, [clients]);
   
-  const months = Array.from({ length: 12 }, (_, i) => ({
+  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
     value: i,
     label: format(new Date(0, i), 'MMMM'),
-  }));
+  })), []);
 
   const canManage = user?.role === 'Admin' || user?.role === 'Superadmin';
 
@@ -621,3 +621,5 @@ function ShopDetailsPage() {
 }
 
 export default withAuth(ShopDetailsPage);
+
+    

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, ArrowDownToLine, ArrowUpFromLine, Loader2 } from "lucide-react";
@@ -23,37 +23,38 @@ function Home() {
   const [selectedMonth, setSelectedMonth] = useState<number>(getMonth(new Date()));
   const [selectedYear, setSelectedYear] = useState<number>(getYear(new Date()));
   
-  const availableYears = [getYear(new Date()), getYear(new Date()) - 1, getYear(new Date()) - 2];
-  const months = Array.from({ length: 12 }, (_, i) => ({
+  const availableYears = useMemo(() => [getYear(new Date()), getYear(new Date()) - 1, getYear(new Date()) - 2], []);
+  
+  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
     value: i,
     label: format(new Date(0, i), 'MMMM'),
-  }));
+  })), []);
 
+  const calculateStats = useCallback(() => {
+    const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
+    const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
+    const interval = { start: startDate, end: endDate };
+
+    const filteredClients = allClients.filter(c => isWithinInterval(c.kycCompletedDate, interval)).length;
+    const filteredDeposits = allDeposits
+      .filter(d => isWithinInterval(d.date, interval))
+      .reduce((sum, d) => sum + d.amount, 0);
+    const filteredWithdrawals = allWithdrawals
+      .filter(w => isWithinInterval(w.date, interval))
+      .reduce((sum, w) => sum + w.amount, 0);
+      
+    setStats({
+      clients: filteredClients,
+      deposits: filteredDeposits,
+      withdrawals: filteredWithdrawals,
+    });
+  }, [selectedMonth, selectedYear, allClients, allDeposits, allWithdrawals]);
+  
   useEffect(() => {
-    const calculateStats = () => {
-      const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
-      const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
-      const interval = { start: startDate, end: endDate };
-
-      const filteredClients = allClients.filter(c => isWithinInterval(c.kycCompletedDate, interval)).length;
-      const filteredDeposits = allDeposits
-        .filter(d => isWithinInterval(d.date, interval))
-        .reduce((sum, d) => sum + d.amount, 0);
-      const filteredWithdrawals = allWithdrawals
-        .filter(w => isWithinInterval(w.date, interval))
-        .reduce((sum, w) => sum + w.amount, 0);
-        
-      setStats({
-        clients: filteredClients,
-        deposits: filteredDeposits,
-        withdrawals: filteredWithdrawals,
-      });
-    };
-    
     if (!dataLoading) {
       calculateStats();
     }
-  }, [selectedMonth, selectedYear, allClients, allDeposits, allWithdrawals, dataLoading]);
+  }, [dataLoading, calculateStats]);
 
   if (dataLoading) {
     return (
@@ -132,3 +133,5 @@ function Home() {
 }
 
 export default withAuth(Home);
+
+    

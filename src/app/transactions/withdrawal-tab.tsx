@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -183,7 +183,7 @@ export default function WithdrawalTab() {
     }
   }, [watchedEditShopId, clients, editForm, withdrawalToEdit]);
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  const onSubmit = useCallback(async (values: z.infer<typeof formSchema>) => {
     try {
       await addDoc(collection(db, "withdrawals"), values);
       toast({
@@ -207,9 +207,9 @@ export default function WithdrawalTab() {
         variant: "destructive"
       });
     }
-  }
+  }, [form, toast]);
   
-  async function onEditSubmit(values: z.infer<typeof formSchema>) {
+  const onEditSubmit = useCallback(async (values: z.infer<typeof formSchema>) => {
     if (!withdrawalToEdit) return;
     try {
         const withdrawalRef = doc(db, "withdrawals", withdrawalToEdit.id);
@@ -219,9 +219,9 @@ export default function WithdrawalTab() {
     } catch(error: any) {
         toast({ title: "Error", description: error.message || "Failed to update withdrawal.", variant: "destructive" });
     }
-  }
+  }, [withdrawalToEdit, toast]);
 
-  const handleDeleteWithdrawal = async () => {
+  const handleDeleteWithdrawal = useCallback(async () => {
     if (!withdrawalToDelete) return;
     try {
         await deleteDoc(doc(db, "withdrawals", withdrawalToDelete.id));
@@ -235,31 +235,31 @@ export default function WithdrawalTab() {
     }
     setDeleteAlertOpen(false);
     setWithdrawalToDelete(null);
-  }
+  }, [withdrawalToDelete, toast]);
   
-  const openEditDialog = (withdrawal: Withdrawal) => {
+  const openEditDialog = useCallback((withdrawal: Withdrawal) => {
     setWithdrawalToEdit(withdrawal);
     editForm.reset({
         ...withdrawal,
         date: withdrawal.date
     });
     setEditOpen(true);
-  }
+  }, [editForm]);
   
-  const openDeleteDialog = (withdrawal: Withdrawal) => {
+  const openDeleteDialog = useCallback((withdrawal: Withdrawal) => {
     setWithdrawalToDelete(withdrawal);
     setDeleteAlertOpen(true);
-  }
+  }, []);
 
   const availableYears = useMemo(() => {
     const years = new Set(withdrawals.map(w => getYear(w.date)));
     return Array.from(years).sort((a,b) => b - a);
   }, [withdrawals]);
   
-  const months = Array.from({ length: 12 }, (_, i) => ({
+  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
     value: i,
     label: format(new Date(0, i), 'MMMM'),
-  }));
+  })), []);
 
   const clientFound = !!watchedShopId && clients.some(c => c.shopId === watchedShopId);
   const clientFoundEdit = !!watchedEditShopId && clients.some(c => c.shopId === watchedEditShopId);
