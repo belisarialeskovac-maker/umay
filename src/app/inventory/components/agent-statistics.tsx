@@ -19,12 +19,18 @@ function AgentStatistics({ agentStats }: AgentStatisticsProps) {
 
   if (data.length === 0) {
     return (
-      <div className="flex h-40 w-full items-center justify-center text-center">
-        <div>
-            <h3 className="text-lg font-semibold">No Data Available</h3>
-            <p className="text-sm text-muted-foreground">Add devices to see agent statistics.</p>
-        </div>
-      </div>
+        <Card>
+            <CardHeader>
+                <CardTitle>Device Distribution by Agent</CardTitle>
+                <CardDescription>Number of devices assigned to each agent.</CardDescription>
+            </CardHeader>
+            <CardContent className="h-[400px] w-full flex items-center justify-center">
+                <div className="text-center">
+                    <h3 className="text-lg font-semibold">No Data Available</h3>
+                    <p className="text-sm text-muted-foreground">Add devices to see agent statistics.</p>
+                </div>
+            </CardContent>
+      </Card>
     )
   }
 

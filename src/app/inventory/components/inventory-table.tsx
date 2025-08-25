@@ -48,6 +48,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import type { DeviceInventory } from "../page"
 import { format } from 'date-fns';
+import { Checkbox } from "@/components/ui/checkbox"
 
 type InventoryTableProps = {
   devices: DeviceInventory[]
@@ -55,7 +56,11 @@ type InventoryTableProps = {
   onUpdate: (id: string, updatedDevice: Partial<DeviceInventory>) => Promise<boolean>
   searchTerm: string
   setSearchTerm: (term: string) => void
-  agentNames: string[]
+  agentNames: string[],
+  selectedDevices: string[],
+  onSelectAll: (checked: boolean) => void,
+  onSelectDevice: (deviceId: string, checked: boolean) => void,
+  canManage: boolean
 }
 
 const editFormSchema = z.object({
@@ -74,7 +79,11 @@ function InventoryTable({
   onUpdate,
   searchTerm,
   setSearchTerm,
-  agentNames
+  agentNames,
+  selectedDevices,
+  onSelectAll,
+  onSelectDevice,
+  canManage
 }: InventoryTableProps) {
   const [editingDevice, setEditingDevice] = useState<DeviceInventory | null>(null)
   const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null)
@@ -110,6 +119,8 @@ function InventoryTable({
     setDeletingDeviceId(null)
   }, [deletingDeviceId, onDelete]);
 
+  const isAllSelected = devices.length > 0 && selectedDevices.length === devices.length;
+
   return (
     <>
       <div className="mb-4">
@@ -124,6 +135,14 @@ function InventoryTable({
         <Table>
           <TableHeader>
             <TableRow>
+              {canManage && (
+                <TableHead>
+                  <Checkbox 
+                    onCheckedChange={(checked) => onSelectAll(Boolean(checked))} 
+                    checked={isAllSelected}
+                  />
+                </TableHead>
+              )}
               <TableHead>Agent</TableHead>
               <TableHead>IMEI</TableHead>
               <TableHead>Model</TableHead>
@@ -140,7 +159,15 @@ function InventoryTable({
           <TableBody>
             {devices.length > 0 ? (
               devices.map((device) => (
-                <TableRow key={device.id}>
+                <TableRow key={device.id} data-state={selectedDevices.includes(device.id) && "selected"}>
+                  {canManage && (
+                    <TableCell>
+                      <Checkbox 
+                        onCheckedChange={(checked) => onSelectDevice(device.id, Boolean(checked))} 
+                        checked={selectedDevices.includes(device.id)} 
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>{device.agent}</TableCell>
                   <TableCell>{device.imei}</TableCell>
                   <TableCell>{device.model}</TableCell>
@@ -178,7 +205,7 @@ function InventoryTable({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center">
+                <TableCell colSpan={10} className="h-24 text-center">
                   No results found.
                 </TableCell>
               </TableRow>
