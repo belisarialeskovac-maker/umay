@@ -309,6 +309,7 @@ export default function WithdrawalTab() {
             }
 
             const clientsMap = new Map(clients.map(c => [c.shopId.toLowerCase(), c]));
+            const agentNamesSet = new Set(agents.map(a => a.name.toLowerCase()));
             
             const validatedData = results.data.map((row: any) => {
                 const getRowValue = (key: string) => {
@@ -321,6 +322,11 @@ export default function WithdrawalTab() {
                 
                 if (!client) {
                     return { data: row, status: 'Invalid Data' as const, reason: 'Shop ID not found.' };
+                }
+
+                const agentName = getRowValue('agent');
+                if (!agentName || !agentNamesSet.has(agentName.toLowerCase())) {
+                    return { data: row, status: 'Invalid Data' as const, reason: `Agent '${agentName}' not found.` };
                 }
 
                 const dateString = getRowValue('date');
@@ -347,7 +353,7 @@ export default function WithdrawalTab() {
                 const finalData = {
                     shopId: client.shopId,
                     clientName: client.clientName,
-                    agent: getRowValue('agent'),
+                    agent: agentName,
                     date: transactionDate,
                     amount: amount,
                     paymentMode: paymentMode
@@ -367,7 +373,7 @@ export default function WithdrawalTab() {
     if(csvInputRef.current) {
         csvInputRef.current.value = "";
     }
-  }, [clients, toast]);
+  }, [clients, agents, toast]);
 
   const handleConfirmImport = useCallback(async () => {
     setIsImporting(true);
