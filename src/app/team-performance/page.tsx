@@ -87,7 +87,6 @@ type TeamPerformanceData = {
     openAccounts: number;
     totalDeposits: number;
     totalWithdrawals: number;
-    lastEditedBy: string;
     editor?: string;
 };
 
@@ -160,7 +159,7 @@ function TeamPerformancePage() {
       };
 
       const storedAgentData = teamPerformanceDocs[agent.name];
-      const isEdited = storedAgentData && storedAgentData.lastEditedBy !== 'System';
+      const isEdited = storedAgentData && storedAgentData.editor;
             
       return {
         agentName: agent.name,
@@ -169,7 +168,7 @@ function TeamPerformancePage() {
         openAccounts: isEdited ? storedAgentData.openAccounts : systemMetrics.openAccounts,
         totalDeposits: isEdited ? storedAgentData.totalDeposits : systemMetrics.totalDeposits,
         totalWithdrawals: isEdited ? storedAgentData.totalWithdrawals : systemMetrics.totalWithdrawals,
-        lastEditedBy: storedAgentData?.editor || "System",
+        editor: storedAgentData?.editor,
       };
     });
   }, [displayAgents, dailyAddedClients, clients, deposits, withdrawals, teamPerformanceDocs]);
@@ -297,7 +296,6 @@ function TeamPerformancePage() {
     const dataToSave = { 
         ...teamPerformance.find(p => p.agentName === agentName), 
         ...editedData, 
-        lastEditedBy: 'Admin',
         editor: user.name,
     };
     await setDoc(perfDocRef, dataToSave, { merge: true });
@@ -349,7 +347,6 @@ function TeamPerformancePage() {
                         <TableHead>Open Accounts</TableHead>
                         <TableHead>Total Deposits</TableHead>
                         <TableHead>Total Withdrawals</TableHead>
-                        <TableHead>Last Edited By</TableHead>
                         <TableHead>Actions</TableHead>
                     </TableRow>
                     </TableHeader>
@@ -382,7 +379,6 @@ function TeamPerformancePage() {
                                     <Input type="number" value={editedData.totalWithdrawals ?? ''} onChange={e => handleInputChange(e, 'totalWithdrawals')} className="w-32" />
                                 ) : `$${item.totalWithdrawals.toFixed(2)}`}
                             </TableCell>
-                            <TableCell>{item.lastEditedBy}</TableCell>
                             <TableCell>
                                 {editingAgent === item.agentName ? (
                                     <div className="flex items-center gap-2">

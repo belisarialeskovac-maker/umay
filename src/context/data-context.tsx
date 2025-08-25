@@ -105,7 +105,6 @@ export type TeamPerformanceData = {
     openAccounts: number;
     totalDeposits: number;
     totalWithdrawals: number;
-    lastEditedBy: string;
     editor?: string;
 };
 
