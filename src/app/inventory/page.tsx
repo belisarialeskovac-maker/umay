@@ -33,6 +33,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 
 export type AgentStats = {
   [key: string]: number
@@ -49,6 +51,7 @@ function InventoryPage() {
   const { inventory: allDevices, agents, loading: dataLoading } = useData();
   
   const [searchTerm, setSearchTerm] = useState("")
+  const [agentFilter, setAgentFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("inventory")
   const { toast } = useToast()
   
@@ -68,7 +71,7 @@ function InventoryPage() {
     return allDevices;
   }, [allDevices, user, dataLoading]);
   
-  const agentNames = useMemo(() => agents.map(a => a.name), [agents]);
+  const agentNames = useMemo(() => agents.filter(a => a.role !== 'Superadmin').map(a => a.name), [agents]);
   
   const agentStats = useMemo(() => {
     const stats: AgentStats = {};
@@ -80,15 +83,14 @@ function InventoryPage() {
 
   const filteredDevices = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
-    if (term === "") {
-      return userVisibleDevices;
-    }
-    return userVisibleDevices.filter((device) =>
-      Object.values(device).some(value => 
-        String(value).toLowerCase().includes(term)
-      )
-    );
-  }, [searchTerm, userVisibleDevices]);
+    return userVisibleDevices.filter((device) => {
+        const matchesAgent = agentFilter === 'all' || device.agent === agentFilter;
+        const matchesSearch = term === "" || Object.values(device).some(value => 
+            String(value).toLowerCase().includes(term)
+        );
+        return matchesAgent && matchesSearch;
+    });
+  }, [searchTerm, userVisibleDevices, agentFilter]);
 
   const addDevice = useCallback(async (device: Omit<DeviceInventory, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) {
@@ -375,7 +377,7 @@ function InventoryPage() {
 
         <TabsContent value="inventory" className="space-y-4">
           <Card>
-            <CardHeader className="pb-3 flex-row items-center justify-between">
+            <CardHeader className="pb-3 flex-row items-start md:items-center justify-between">
               <div>
                 <CardTitle>Device Inventory</CardTitle>
                 <CardDescription>{filteredDevices.length} devices in total.</CardDescription>
@@ -387,12 +389,33 @@ function InventoryPage() {
               )}
             </CardHeader>
             <CardContent>
+             {canManage && (
+                <div className="flex flex-col md:flex-row gap-4 mb-4">
+                    <Input
+                        placeholder="Search inventory..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="max-w-sm"
+                    />
+                    <Select value={agentFilter} onValueChange={setAgentFilter}>
+                        <SelectTrigger className="w-full md:w-[200px]">
+                            <SelectValue placeholder="Filter by agent" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Agents</SelectItem>
+                            {agentNames.map((name) => (
+                                <SelectItem key={name} value={name}>
+                                    {name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
               <InventoryTable
                   devices={filteredDevices}
                   onDelete={deleteDevice}
                   onUpdate={updateDevice}
-                  searchTerm={searchTerm}
-                  setSearchTerm={setSearchTerm}
                   agentNames={agentNames}
                   selectedDevices={selectedDevices}
                   onSelectAll={handleSelectAll}

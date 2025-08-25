@@ -10,7 +10,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -49,13 +48,12 @@ import { Textarea } from "@/components/ui/textarea"
 import type { DeviceInventory } from "../page"
 import { format } from 'date-fns';
 import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
 
 type InventoryTableProps = {
   devices: DeviceInventory[]
   onDelete: (id: string) => Promise<boolean>
   onUpdate: (id: string, updatedDevice: Partial<DeviceInventory>) => Promise<boolean>
-  searchTerm: string
-  setSearchTerm: (term: string) => void
   agentNames: string[],
   selectedDevices: string[],
   onSelectAll: (checked: boolean) => void,
@@ -65,7 +63,7 @@ type InventoryTableProps = {
 
 const editFormSchema = z.object({
   agent: z.string().min(1, "Agent is required."),
-  imei: z.string().min(15, "IMEI must be 15 characters.").max(17, "IMEI must be 17 characters."),
+  imei: z.string().min(15, "IMEI must be 15 characters.").max(17, "IMEI must be at most 17 characters."),
   model: z.string().min(1, "Model is required."),
   color: z.string().min(1, "Color is required."),
   username: z.string().optional(),
@@ -77,8 +75,6 @@ function InventoryTable({
   devices,
   onDelete,
   onUpdate,
-  searchTerm,
-  setSearchTerm,
   agentNames,
   selectedDevices,
   onSelectAll,
@@ -128,14 +124,6 @@ function InventoryTable({
 
   return (
     <>
-      <div className="mb-4">
-        <Input
-          placeholder="Search inventory..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
-        />
-      </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
