@@ -593,5 +593,3 @@ function TeamPerformancePage() {
 
 
 export default withAuth(TeamPerformancePage, ['Admin', 'Superadmin']);
-
-    

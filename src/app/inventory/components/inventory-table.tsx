@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useCallback } from "react"
 import {
   Table,
   TableBody,
@@ -83,7 +83,7 @@ function InventoryTable({
     resolver: zodResolver(editFormSchema),
   })
 
-  const handleEditClick = (device: DeviceInventory) => {
+  const handleEditClick = useCallback((device: DeviceInventory) => {
     setEditingDevice(device)
     form.reset({
       agent: device.agent,
@@ -94,21 +94,21 @@ function InventoryTable({
       appleIdPassword: device.appleIdPassword || "",
       remarks: device.remarks || "",
     })
-  }
+  }, [form]);
 
-  const handleUpdateSubmit = async (values: z.infer<typeof editFormSchema>) => {
+  const handleUpdateSubmit = useCallback(async (values: z.infer<typeof editFormSchema>) => {
     if (!editingDevice) return
     const success = await onUpdate(editingDevice.id, values)
     if (success) {
       setEditingDevice(null)
     }
-  }
+  }, [editingDevice, onUpdate]);
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = useCallback(async () => {
     if (!deletingDeviceId) return
     await onDelete(deletingDeviceId)
     setDeletingDeviceId(null)
-  }
+  }, [deletingDeviceId, onDelete]);
 
   return (
     <>
