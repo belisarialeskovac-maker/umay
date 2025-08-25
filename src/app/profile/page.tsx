@@ -270,13 +270,13 @@ function ProfilePage() {
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2">
                     <Button asChild variant="outline" className="justify-start">
-                        <Link href="/inventory"><Boxes className="mr-2 h-4 w-4" /> My Inventory</Link>
+                        <Link href="/inventory" legacyBehavior={false}><Boxes className="mr-2 h-4 w-4" /> My Inventory</Link>
                     </Button>
                     <Button asChild variant="outline" className="justify-start">
-                        <Link href="/reporting"><FileText className="mr-2 h-4 w-4" /> Create Daily Report</Link>
+                        <Link href="/reporting" legacyBehavior={false}><FileText className="mr-2 h-4 w-4" /> Create Daily Report</Link>
                     </Button>
                     <Button asChild variant="outline" className="justify-start">
-                        <Link href="/videocall-template"><Video className="mr-2 h-4 w-4" /> Videocall Template</Link>
+                        <Link href="/videocall-template" legacyBehavior={false}><Video className="mr-2 h-4 w-4" /> Videocall Template</Link>
                     </Button>
                     <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
                         <DialogTrigger asChild>
