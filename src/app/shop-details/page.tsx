@@ -153,7 +153,9 @@ function ShopDetailsPage() {
   const displayAgents = useMemo(() => agents.filter(agent => agent.role !== 'Superadmin'), [agents]);
   
   const filteredClients = useMemo(() => {
-    return userVisibleClients.filter(client => {
+    const clientsToFilter = [...userVisibleClients].sort((a, b) => b.kycCompletedDate.getTime() - a.kycCompletedDate.getTime());
+    
+    return clientsToFilter.filter(client => {
         const lowercasedTerm = searchTerm.toLowerCase();
         const matchesSearch = searchTerm.trim() === '' ||
             client.shopId.toLowerCase().includes(lowercasedTerm) ||
