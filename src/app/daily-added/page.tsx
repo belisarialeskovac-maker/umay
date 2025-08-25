@@ -3,8 +3,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { z } from 'zod';
-import { format, isToday, isThisMonth } from 'date-fns';
-import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays, BarChart, Loader2, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { format, isToday, isThisMonth, getMonth, getYear } from 'date-fns';
+import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays, BarChart, Loader2, MoreHorizontal, Edit, Trash2, Search } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
@@ -54,6 +54,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -87,11 +94,15 @@ function DailyAddedPage() {
   const [isAddingClient, setIsAddingClient] = useState(false);
   const { toast } = useToast();
 
-  const [visibleClients, setVisibleClients] = useState<Client[]>([]);
   const [dailyCount, setDailyCount] = useState(0);
   const [monthlyCount, setMonthlyCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [agentStats, setAgentStats] = useState<AgentStats>({});
+  
+  const [searchTerm, setSearchTerm] = useState("");
+  const [agentFilter, setAgentFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState("all");
+  const [yearFilter, setYearFilter] = useState("all");
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
@@ -104,19 +115,38 @@ function DailyAddedPage() {
     resolver: zodResolver(formSchema),
   });
 
-  useEffect(() => {
-    if (user && !dataLoading) {
-      if (user.role === 'Agent') {
-        setVisibleClients(dailyAddedClients.filter(c => c.assignedAgent === user.name));
-      } else {
-        setVisibleClients(dailyAddedClients);
-      }
+  const userVisibleClients = useMemo(() => {
+    if (!user || dataLoading) return [];
+    if (user.role === 'Agent') {
+      return dailyAddedClients.filter(c => c.assignedAgent === user.name);
     }
-  }, [user, dailyAddedClients, dataLoading]);
+    return dailyAddedClients;
+  }, [dailyAddedClients, user, dataLoading]);
+  
+  const filteredClients = useMemo(() => {
+     return userVisibleClients.filter(client => {
+        const lowercasedTerm = searchTerm.toLowerCase();
+        const matchesSearch = searchTerm.trim() === '' ||
+            client.name.toLowerCase().includes(lowercasedTerm) ||
+            String(client.age).includes(lowercasedTerm) ||
+            client.location.toLowerCase().includes(lowercasedTerm) ||
+            client.work.toLowerCase().includes(lowercasedTerm) ||
+            client.assignedAgent.toLowerCase().includes(lowercasedTerm);
+
+        const matchesAgent = agentFilter === 'all' || client.assignedAgent === agentFilter;
+        
+        const clientDate = new Date(client.date);
+        const matchesMonth = monthFilter === 'all' || getMonth(clientDate) === parseInt(monthFilter);
+        const matchesYear = yearFilter === 'all' || getYear(clientDate) === parseInt(yearFilter);
+
+        return matchesSearch && matchesAgent && matchesMonth && matchesYear;
+    });
+  }, [userVisibleClients, searchTerm, agentFilter, monthFilter, yearFilter]);
+
 
   const calculateStats = useCallback(() => {
     if (!dataLoading && user) {
-        const statsSource = user.role === 'Agent' ? visibleClients : dailyAddedClients;
+        const statsSource = user.role === 'Agent' ? userVisibleClients : dailyAddedClients;
         
         const daily = statsSource.filter(c => isToday(new Date(c.date)));
         const monthly = statsSource.filter(c => isThisMonth(new Date(c.date)));
@@ -142,7 +172,7 @@ function DailyAddedPage() {
         });
         setAgentStats(stats);
     }
-  }, [dataLoading, user, visibleClients, dailyAddedClients, agents]);
+  }, [dataLoading, user, userVisibleClients, dailyAddedClients, agents]);
 
   useEffect(() => {
     calculateStats();
@@ -150,7 +180,7 @@ function DailyAddedPage() {
 
   const ageData = useMemo(() => {
     const ageGroups = { '18-25': 0, '26-35': 0, '36-45': 0, '46-55': 0, '56+': 0, 'Unknown': 0 };
-    visibleClients.forEach(client => {
+    filteredClients.forEach(client => {
         if (client.age >= 18 && client.age <= 25) ageGroups['18-25']++;
         else if (client.age >= 26 && client.age <= 35) ageGroups['26-35']++;
         else if (client.age >= 36 && client.age <= 45) ageGroups['36-45']++;
@@ -159,7 +189,7 @@ function DailyAddedPage() {
         else ageGroups['Unknown']++;
     });
     return Object.entries(ageGroups).map(([name, value]) => ({ name, count: value }));
-  }, [visibleClients]);
+  }, [filteredClients]);
 
   const handleAddClient = useCallback(async () => {
     if (isAddingClient || !user) {
@@ -260,10 +290,23 @@ function DailyAddedPage() {
     setClientToDelete(client);
     setDeleteAlertOpen(true);
   }, []);
+  
+  const displayAgents = useMemo(() => agents.filter(agent => agent.role !== 'Superadmin'), [agents]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set(userVisibleClients.map(c => getYear(new Date(c.date))));
+    return Array.from(years).sort((a,b) => b - a);
+  }, [userVisibleClients]);
+  
+  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+    value: i,
+    label: format(new Date(0, i), 'MMMM'),
+  })), []);
+
 
   const handleSelectAll = useCallback((checked: boolean) => {
-    setSelectedClients(checked ? visibleClients.map(c => c.id) : []);
-  }, [visibleClients]);
+    setSelectedClients(checked ? filteredClients.map(c => c.id) : []);
+  }, [filteredClients]);
 
   const handleSelectClient = useCallback((clientId: string, checked: boolean) => {
     setSelectedClients(prev => checked ? [...prev, clientId] : prev.filter(id => id !== clientId));
@@ -313,19 +356,50 @@ function DailyAddedPage() {
                           <h2 className="text-xl font-semibold">All Added Clients</h2>
                           {canManage && selectedClients.length > 0 && (<Button size="sm" variant="destructive" onClick={() => setBulkDeleteAlertOpen(true)}><Trash2 className="mr-2 h-4 w-4" />Delete Selected ({selectedClients.length})</Button>)}
                         </div>
-                        {visibleClients.length > 0 ? (<div className="rounded-lg border bg-card">
+                        
+                         <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                            <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="Search clients..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                            </div>
+                            {canManage && (
+                                <Select value={agentFilter} onValueChange={setAgentFilter}>
+                                    <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by agent" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Agents</SelectItem>
+                                        {displayAgents.map(agent => (<SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                            <Select value={monthFilter} onValueChange={setMonthFilter}>
+                                <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by month" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Months</SelectItem>
+                                    {months.map(m => (<SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>))}
+                                </SelectContent>
+                            </Select>
+                            <Select value={yearFilter} onValueChange={setYearFilter}>
+                                <SelectTrigger className="w-full sm:w-[120px]"><SelectValue placeholder="Filter by year" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Years</SelectItem>
+                                    {availableYears.map(y => (<SelectItem key={y} value={String(y)}>{y}</SelectItem>))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        
+                        {filteredClients.length > 0 ? (<div className="rounded-lg border bg-card">
                             <Table><TableHeader><TableRow>
-                                {canManage && <TableHead><Checkbox onCheckedChange={(checked) => handleSelectAll(Boolean(checked))} checked={selectedClients.length === visibleClients.length && visibleClients.length > 0} /></TableHead>}
+                                {canManage && <TableHead><Checkbox onCheckedChange={(checked) => handleSelectAll(Boolean(checked))} checked={selectedClients.length === filteredClients.length && filteredClients.length > 0} /></TableHead>}
                                 <TableHead><User className="inline-block mr-2 h-4 w-4" />Name</TableHead><TableHead><ClipboardList className="inline-block mr-2 h-4 w-4" />Age</TableHead><TableHead><MapPin className="inline-block mr-2 h-4 w-4" />Location</TableHead><TableHead><Briefcase className="inline-block mr-2 h-4 w-4" />Work</TableHead><TableHead><UserPlus className="inline-block mr-2 h-4 w-4" />Assigned Agent</TableHead><TableHead><Calendar className="inline-block mr-2 h-4 w-4" />Date</TableHead>
                                 {canManage && <TableHead>Actions</TableHead>}
                             </TableRow></TableHeader><TableBody>
-                                {visibleClients.map((client) => (<TableRow key={client.id} data-state={selectedClients.includes(client.id) && "selected"}>
+                                {filteredClients.map((client) => (<TableRow key={client.id} data-state={selectedClients.includes(client.id) && "selected"}>
                                     {canManage && <TableCell><Checkbox onCheckedChange={(checked) => handleSelectClient(client.id, Boolean(checked))} checked={selectedClients.includes(client.id)} /></TableCell>}
-                                    <TableCell>{client.name}</TableCell><TableCell>{client.age}</TableCell><TableCell>{client.location}</TableCell><TableCell>{client.work}</TableCell><TableCell>{client.assignedAgent}</TableCell><TableCell>{format(client.date, 'PPP')}</TableCell>
+                                    <TableCell>{client.name}</TableCell><TableCell>{client.age}</TableCell><TableCell>{client.location}</TableCell><TableCell>{client.work}</TableCell><TableCell>{client.assignedAgent}</TableCell><TableCell>{format(new Date(client.date), 'PPP')}</TableCell>
                                     {canManage && <TableCell><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuLabel>Actions</DropdownMenuLabel><DropdownMenuItem onClick={() => openEditDialog(client)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem><DropdownMenuItem onClick={() => openDeleteDialog(client)} className="text-red-600"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>}
                                 </TableRow>))}
                             </TableBody></Table></div>
-                        ) : (<div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm min-h-[30vh]"><div className="text-center"><h2 className="text-2xl font-bold tracking-tight text-foreground">No Clients Added Yet</h2><p className="text-muted-foreground mt-2">{user?.role === 'Agent' ? 'Clients you add will appear here.' : 'Clients added from the parsing area will appear here.'}</p></div></div>)}
+                        ) : (<div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm min-h-[30vh]"><div className="text-center"><h2 className="text-2xl font-bold tracking-tight text-foreground">No Clients Found</h2><p className="text-muted-foreground mt-2">{user?.role === 'Agent' ? 'Clients you add will appear here.' : 'Try adjusting your filters.'}</p></div></div>)}
                     </div>
                 </div>
             </TabsContent>
