@@ -94,9 +94,9 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
         <div className="w-full max-w-md">
-            <Card>
+            <Card className="border-border/50 shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-[1.02]">
                 <CardHeader className="text-center">
-                     <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                     <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 shadow-inner-lg">
                         <Boxes className="h-8 w-8 text-primary" />
                     </div>
                     <CardTitle className="text-3xl font-bold">Welcome Back</CardTitle>
