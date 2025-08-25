@@ -44,14 +44,16 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const auth = getAuth(app)
-  const { user, setInitialLogin } = useAuth()
+  const { user, setInitialLogin, loading: authLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (user) {
+    if (!authLoading && user) {
+      // If user is already logged in, the app shell will handle redirection or showing the dashboard.
+      // However, we can push to root to ensure they don't stay on the login page.
       router.push('/')
     }
-  }, [user, router]);
+  }, [user, authLoading, router]);
 
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -66,10 +68,7 @@ export default function LoginPage() {
     setIsSubmitting(true)
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password)
-      toast({
-        title: "Login Successful",
-        description: "Welcome back!",
-      })
+      // The setInitialLogin(true) will trigger the loading screen in AppShell
       setInitialLogin(true);
     } catch (error: any) {
       console.error("Login failed:", error)
