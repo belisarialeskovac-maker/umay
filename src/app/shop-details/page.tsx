@@ -92,7 +92,7 @@ const formSchema = z.object({
 type ClientFormData = z.infer<typeof formSchema>;
 type PreviewRow = {
     data: any;
-    status: 'Ready to Import' | 'Duplicate ID' | 'Invalid Data';
+    status: 'Ready to Import' | 'Duplicate ID' | 'Invalid Data' | 'Unknown Agent';
     reason?: string;
 }
 
@@ -116,6 +116,7 @@ function ShopDetailsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [agentFilter, setAgentFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
   const [newBulkStatus, setNewBulkStatus] = useState<typeof clientStatus[number] | ''>('');
@@ -162,17 +163,18 @@ function ShopDetailsPage() {
             client.clientName.toLowerCase().includes(lowercasedTerm) ||
             client.agent.toLowerCase().includes(lowercasedTerm) ||
             client.status.toLowerCase().includes(lowercasedTerm) ||
-            client.clientDetails.toLowerCase().includes(lowercasedTerm);
+            (client.clientDetails && client.clientDetails.toLowerCase().includes(lowercasedTerm));
 
         const matchesAgent = agentFilter === 'all' || client.agent === agentFilter;
+        const matchesStatus = statusFilter === 'all' || client.status === statusFilter;
         
         const clientDate = client.kycCompletedDate;
         const matchesMonth = monthFilter === 'all' || getMonth(clientDate) === parseInt(monthFilter);
         const matchesYear = yearFilter === 'all' || getYear(clientDate) === parseInt(yearFilter);
 
-        return matchesSearch && matchesAgent && matchesMonth && matchesYear;
+        return matchesSearch && matchesAgent && matchesStatus && matchesMonth && matchesYear;
     });
-  }, [userVisibleClients, searchTerm, agentFilter, monthFilter, yearFilter]);
+  }, [userVisibleClients, searchTerm, agentFilter, statusFilter, monthFilter, yearFilter]);
 
   const paginatedClients = useMemo(() => {
     const startIndex = (currentPage - 1) * CLIENTS_PER_PAGE;
@@ -185,7 +187,7 @@ function ShopDetailsPage() {
   useEffect(() => {
     setCurrentPage(1); // Reset to first page on filter change
     setSelectedClients([]); // Clear selections on filter change
-  }, [searchTerm, agentFilter, monthFilter, yearFilter]);
+  }, [searchTerm, agentFilter, statusFilter, monthFilter, yearFilter]);
 
   const onSubmit = useCallback(async (values: ClientFormData) => {
     try {
@@ -320,6 +322,7 @@ function ShopDetailsPage() {
 
             const clientsData = results.data as any[];
             const existingShopIds = new Set(allClients.map(c => c.shopId));
+            const existingAgentNames = new Set(agents.map(a => a.name.toLowerCase()));
             
             const validatedData = clientsData.map(row => {
                 // Find keys case-insensitively
@@ -346,13 +349,24 @@ function ShopDetailsPage() {
                     return { data: row, status: 'Invalid Data', reason: `Status must be one of: ${clientStatus.join(', ')}` };
                 }
 
+                const agentName = getRowValue('agent');
+                if (!agentName || !existingAgentNames.has(agentName.toLowerCase())) {
+                    return { data: row, status: 'Unknown Agent', reason: `Agent '${agentName}' does not exist.` };
+                }
+                
+                const clientDetailsValue = getRowValue('clientDetails');
+                if (clientDetailsValue === undefined || clientDetailsValue === null) {
+                    return { data: row, status: 'Invalid Data', reason: 'clientDetails column is missing or empty.' };
+                }
+
+
                 const finalData = {
                     shopId: shopId,
                     clientName: getRowValue('clientName'),
-                    agent: getRowValue('agent'),
+                    agent: agentName,
                     kycCompletedDate: kycDate,
                     status: statusValue,
-                    clientDetails: getRowValue('clientDetails') || ''
+                    clientDetails: clientDetailsValue || ''
                 };
 
 
@@ -374,7 +388,7 @@ function ShopDetailsPage() {
     if(csvInputRef.current) {
         csvInputRef.current.value = "";
     }
-  }, [allClients, toast]);
+  }, [allClients, agents, toast]);
 
   const handleConfirmImport = useCallback(async () => {
     setIsImporting(true);
@@ -568,6 +582,13 @@ function ShopDetailsPage() {
                 </SelectContent>
             </Select>
         )}
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by status" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {clientStatus.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}
+            </SelectContent>
+        </Select>
         <Select value={monthFilter} onValueChange={setMonthFilter}>
             <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by month" /></SelectTrigger>
             <SelectContent>
