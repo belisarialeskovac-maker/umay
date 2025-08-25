@@ -449,32 +449,30 @@ function ProfilePage() {
                             </Table>
                              {renderPaginationControls(clientsTotalPages, clientsPage, setClientsPage)}
                         </TabsContent>
-                        <TabsContent value="transactions" className="pt-4">
-                            <div className="grid gap-6 md:grid-cols-2">
-                                <div>
-                                    <h3 className="text-lg font-medium mb-2 flex items-center"><Activity className="mr-2 h-5 w-5"/>Deposits</h3>
-                                    <Table>
-                                        <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                                        <TableBody>
-                                            {paginatedDeposits.length > 0 ? paginatedDeposits.map((d,i) => (
-                                                <TableRow key={d.id}><TableCell>{d.shopId}</TableCell><TableCell>{d.clientName}</TableCell><TableCell>{format(d.date, "PPP")}</TableCell><TableCell className="text-right">${d.amount.toFixed(2)}</TableCell></TableRow>
-                                            )) : <TableRow><TableCell colSpan={4} className="text-center">No deposits found.</TableCell></TableRow>}
-                                        </TableBody>
-                                    </Table>
-                                    {renderPaginationControls(depositsTotalPages, depositsPage, setDepositsPage)}
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-medium mb-2 flex items-center"><Activity className="mr-2 h-5 w-5"/>Withdrawals</h3>
-                                    <Table>
-                                        <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                                        <TableBody>
-                                            {paginatedWithdrawals.length > 0 ? paginatedWithdrawals.map((w,i) => (
-                                                <TableRow key={w.id}><TableCell>{w.shopId}</TableCell><TableCell>{w.clientName}</TableCell><TableCell>{format(w.date, "PPP")}</TableCell><TableCell className="text-right">${w.amount.toFixed(2)}</TableCell></TableRow>
-                                            )) : <TableRow><TableCell colSpan={4} className="text-center">No withdrawals found.</TableCell></TableRow>}
-                                        </TableBody>
-                                    </Table>
-                                     {renderPaginationControls(withdrawalsTotalPages, withdrawalsPage, setWithdrawalsPage)}
-                                </div>
+                        <TabsContent value="transactions" className="pt-4 space-y-6">
+                            <div>
+                                <h3 className="text-lg font-medium mb-2 flex items-center"><Activity className="mr-2 h-5 w-5 text-green-500"/>Deposits</h3>
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {paginatedDeposits.length > 0 ? paginatedDeposits.map((d,i) => (
+                                            <TableRow key={d.id}><TableCell>{d.shopId}</TableCell><TableCell>{d.clientName}</TableCell><TableCell>{format(d.date, "PPP")}</TableCell><TableCell className="text-right">${d.amount.toFixed(2)}</TableCell></TableRow>
+                                        )) : <TableRow><TableCell colSpan={4} className="text-center">No deposits found.</TableCell></TableRow>}
+                                    </TableBody>
+                                </Table>
+                                {renderPaginationControls(depositsTotalPages, depositsPage, setDepositsPage)}
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-medium mb-2 flex items-center"><Activity className="mr-2 h-5 w-5 text-red-500"/>Withdrawals</h3>
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {paginatedWithdrawals.length > 0 ? paginatedWithdrawals.map((w,i) => (
+                                            <TableRow key={w.id}><TableCell>{w.shopId}</TableCell><TableCell>{w.clientName}</TableCell><TableCell>{format(w.date, "PPP")}</TableCell><TableCell className="text-right">${w.amount.toFixed(2)}</TableCell></TableRow>
+                                        )) : <TableRow><TableCell colSpan={4} className="text-center">No withdrawals found.</TableCell></TableRow>}
+                                    </TableBody>
+                                </Table>
+                                 {renderPaginationControls(withdrawalsTotalPages, withdrawalsPage, setWithdrawalsPage)}
                             </div>
                         </TabsContent>
                         <TabsContent value="inventory" className="pt-4">
