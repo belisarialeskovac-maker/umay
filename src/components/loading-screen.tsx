@@ -10,7 +10,7 @@ export default function LoadingScreen() {
   const [fadeOut, setFadeOut] = useState(false);
   const router = useRouter();
 
-  const fullText = 'CollaBoard';
+  const fullText = 'TEAM HOTEL';
 
   useEffect(() => {
     let currentIndex = 0;
