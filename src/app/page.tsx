@@ -2,23 +2,41 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, ArrowDownToLine, ArrowUpFromLine, Loader2 } from "lucide-react";
+import { Users, ArrowDownToLine, ArrowUpFromLine, Loader2, Trophy } from "lucide-react";
 import { format, getMonth, getYear, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import withAuth from '@/components/with-auth';
 import { useAuth } from '@/context/auth-context';
 import { useData } from '@/context/data-context';
+import type { Agent } from '@/context/data-context';
+
+type LeaderboardEntry = {
+    agentName: string;
+    value: number;
+}
 
 function Home() {
   const { loading: authLoading } = useAuth();
-  const { clients: allClients, deposits: allDeposits, withdrawals: allWithdrawals, loading: dataLoading } = useData();
+  const { 
+    agents, 
+    clients: allClients, 
+    deposits: allDeposits, 
+    withdrawals: allWithdrawals, 
+    dailyAddedClients: allDailyAddedClients,
+    loading: dataLoading 
+  } = useData();
   
   const [stats, setStats] = useState({
     clients: 0,
     deposits: 0,
     withdrawals: 0,
   });
+
+  const [topDeposits, setTopDeposits] = useState<LeaderboardEntry[]>([]);
+  const [topShops, setTopShops] = useState<LeaderboardEntry[]>([]);
+  const [topClientsAdded, setTopClientsAdded] = useState<LeaderboardEntry[]>([]);
 
   const [selectedMonth, setSelectedMonth] = useState<number>(getMonth(new Date()));
   const [selectedYear, setSelectedYear] = useState<number>(getYear(new Date()));
@@ -35,6 +53,7 @@ function Home() {
     const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
     const interval = { start: startDate, end: endDate };
 
+    // Dashboard Stats
     const filteredClients = allClients.filter(c => isWithinInterval(c.kycCompletedDate, interval)).length;
     const filteredDeposits = allDeposits
       .filter(d => isWithinInterval(d.date, interval))
@@ -48,7 +67,31 @@ function Home() {
       deposits: filteredDeposits,
       withdrawals: filteredWithdrawals,
     });
-  }, [selectedMonth, selectedYear, allClients, allDeposits, allWithdrawals]);
+
+    const displayAgents = agents.filter(agent => agent.role !== 'Superadmin');
+    
+    // Leaderboards
+    const depositsByAgent = displayAgents.map(agent => {
+        const total = allDeposits
+            .filter(d => d.agent === agent.name && isWithinInterval(d.date, interval))
+            .reduce((sum, d) => sum + d.amount, 0);
+        return { agentName: agent.name, value: total };
+    }).sort((a,b) => b.value - a.value).slice(0,10);
+    setTopDeposits(depositsByAgent);
+
+    const shopsByAgent = displayAgents.map(agent => {
+        const count = allClients.filter(c => c.agent === agent.name && isWithinInterval(c.kycCompletedDate, interval)).length;
+        return { agentName: agent.name, value: count };
+    }).sort((a,b) => b.value - a.value).slice(0,10);
+    setTopShops(shopsByAgent);
+    
+    const clientsAddedByAgent = displayAgents.map(agent => {
+        const count = allDailyAddedClients.filter(c => c.assignedAgent === agent.name && isWithinInterval(c.date, interval)).length;
+        return { agentName: agent.name, value: count };
+    }).sort((a,b) => b.value - a.value).slice(0,10);
+    setTopClientsAdded(clientsAddedByAgent);
+
+  }, [selectedMonth, selectedYear, allClients, allDeposits, allWithdrawals, allDailyAddedClients, agents]);
   
   useEffect(() => {
     if (!dataLoading) {
@@ -64,9 +107,37 @@ function Home() {
     );
   }
 
+  const renderLeaderboard = (title: string, data: LeaderboardEntry[], isCurrency = false) => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Trophy className="text-yellow-500"/> {title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Rank</TableHead>
+              <TableHead>Agent</TableHead>
+              <TableHead>Total</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.map((entry, index) => (
+              <TableRow key={index}>
+                <TableCell>{index + 1}</TableCell>
+                <TableCell>{entry.agentName}</TableCell>
+                <TableCell>{isCurrency ? `$${entry.value.toFixed(2)}` : entry.value}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <div className="w-full h-full">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+    <div className="w-full h-full space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div className="mb-4 sm:mb-0">
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground mt-1">An overview of your workspace for {months[selectedMonth].label} {selectedYear}.</p>
@@ -128,10 +199,17 @@ function Home() {
         </Card>
       </div>
 
+      <div>
+        <h2 className="text-2xl font-bold text-foreground mb-4">Performance Leaderboards</h2>
+        <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
+          {renderLeaderboard("Top 10 Agent Deposits", topDeposits, true)}
+          {renderLeaderboard("Top 10 Shop Open", topShops)}
+          {renderLeaderboard("Top 10 Client Added", topClientsAdded)}
+        </div>
+      </div>
+
     </div>
   );
 }
 
 export default withAuth(Home);
-
-    
