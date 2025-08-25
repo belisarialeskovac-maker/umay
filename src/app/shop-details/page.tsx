@@ -322,10 +322,9 @@ function ShopDetailsPage() {
                     return { data: row, status: 'Duplicate ID', reason: 'Shop ID already exists.' };
                 }
                 
-                // Try parsing different date formats
                 let kycDate = new Date(row.kycCompletedDate);
                 if (!isValid(kycDate)) {
-                  kycDate = parseISO(row.kycCompletedDate);
+                    kycDate = parseISO(row.kycCompletedDate);
                 }
 
                 if (!isValid(kycDate)) {
@@ -334,7 +333,7 @@ function ShopDetailsPage() {
                 if (!clientStatus.includes(row.status)) {
                     return { data: row, status: 'Invalid Data', reason: `Status must be one of: ${clientStatus.join(', ')}` };
                 }
-                if (!row.clientDetails || row.clientDetails.trim() === '') {
+                 if (!row.clientDetails || row.clientDetails.trim() === '') {
                     return { data: row, status: 'Invalid Data', reason: 'clientDetails cannot be blank.' };
                 }
                 return { data: { ...row, kycCompletedDate: kycDate }, status: 'Ready to Import' };
@@ -811,3 +810,5 @@ function ShopDetailsPage() {
 }
 
 export default withAuth(ShopDetailsPage, ['Agent', 'Admin', 'Superadmin']);
+
+    
