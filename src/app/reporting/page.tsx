@@ -46,8 +46,6 @@ function ReportingPage() {
     dailyAddedClients,
     loading: dataLoading 
   } = useData();
-
-  const [agentClients, setAgentClients] = useState<Client[]>([]);
   
   const [clientInfoList, setClientInfoList] = useState<ClientInformation[]>([]);
   const [generatedReport, setGeneratedReport] = useState("");
@@ -60,6 +58,12 @@ function ReportingPage() {
     const todayStr = format(startOfToday(), 'yyyy-MM-dd');
     return doc(db, 'dailyReports', `${user.uid}_${todayStr}`);
   }, [user]);
+
+  const agentClients = useMemo(() => {
+    if (!user || !clients) return [];
+    return clients.filter(item => item.agent === user.name);
+  }, [user, clients]);
+
 
   useEffect(() => {
     if (!user || !getReportDocRef()) {
@@ -89,13 +93,6 @@ function ReportingPage() {
   }, [user, getReportDocRef, toast]);
 
 
-  useEffect(() => {
-    if (user && !dataLoading) {
-        const filterByName = (collection: any[]) => collection.filter(item => item.agent === user.name || item.assignedAgent === user.name);
-        setAgentClients(filterByName(clients));
-    }
-  }, [user, clients, dataLoading]);
-
   const agentStats = useMemo(() => {
     if (!user) return {
       addedToday: 0,
@@ -115,7 +112,7 @@ function ReportingPage() {
   }, [user, dailyAddedClients, clients, deposits]);
 
 
-  const saveReportData = async (updatedClientInfoList: ClientInformation[]) => {
+  const saveReportData = useCallback(async (updatedClientInfoList: ClientInformation[]) => {
     const docRef = getReportDocRef();
     if (!docRef) return;
     try {
@@ -124,10 +121,10 @@ function ReportingPage() {
         console.error("Failed to save report data:", error);
         toast({ title: "Save Error", description: "Failed to save report progress.", variant: "destructive" });
     }
-  };
+  }, [getReportDocRef, toast]);
 
 
-  const addClient = () => {
+  const addClient = useCallback(() => {
     const newClient: ClientInformation = {
       id: new Date().getTime().toString(),
       shopId: '',
@@ -137,41 +134,47 @@ function ReportingPage() {
       planForTomorrow: '',
       isCollapsed: false,
     };
-    const updatedList = [...clientInfoList, newClient];
-    setClientInfoList(updatedList);
-    saveReportData(updatedList);
-  };
+    setClientInfoList(prevList => {
+      const updatedList = [...prevList, newClient];
+      saveReportData(updatedList);
+      return updatedList;
+    });
+  }, [saveReportData]);
   
-  const removeClient = (id: string) => {
-    const updatedList = clientInfoList.filter(client => client.id !== id);
-    setClientInfoList(updatedList);
-    saveReportData(updatedList);
-  };
+  const removeClient = useCallback((id: string) => {
+    setClientInfoList(prevList => {
+        const updatedList = prevList.filter(client => client.id !== id);
+        saveReportData(updatedList);
+        return updatedList;
+    });
+  }, [saveReportData]);
   
-  const handleClientInfoChange = (id: string, field: keyof Omit<ClientInformation, 'id' | 'isCollapsed'>, value: string) => {
-    const updatedList = clientInfoList.map(client =>
-      client.id === id ? { ...client, [field]: value } : client
-    );
-    setClientInfoList(updatedList);
-    // Debounce this in a real app if performance is an issue
-    saveReportData(updatedList);
-  };
+  const handleClientInfoChange = useCallback((id: string, field: keyof Omit<ClientInformation, 'id' | 'isCollapsed'>, value: string) => {
+    setClientInfoList(prevList => {
+        const updatedList = prevList.map(client =>
+          client.id === id ? { ...client, [field]: value } : client
+        );
+        // Debounce this in a real app if performance is an issue
+        saveReportData(updatedList);
+        return updatedList;
+    });
+  }, [saveReportData]);
 
-  const toggleClientCollapse = (id: string) => {
-    const updatedList = clientInfoList.map(client =>
-      client.id === id ? { ...client, isCollapsed: !client.isCollapsed } : client
+  const toggleClientCollapse = useCallback((id: string) => {
+    setClientInfoList(prevList => 
+        prevList.map(client =>
+            client.id === id ? { ...client, isCollapsed: !client.isCollapsed } : client
+        )
     );
-    setClientInfoList(updatedList);
-    // No need to save collapse state to DB
-  }
+  }, []);
 
-  const getProgress = (client: ClientInformation) => {
+  const getProgress = useCallback((client: ClientInformation) => {
     const requiredFields: (keyof Omit<ClientInformation, 'id'| 'isCollapsed' | 'shopId' | 'assets' | 'clientDetails'>)[] = ['conversationSummary', 'planForTomorrow'];
     const filledCount = requiredFields.filter(field => client[field].trim() !== '').length;
     return (filledCount / requiredFields.length) * 100;
-  }
+  }, []);
 
-  const handleGenerateReport = () => {
+  const handleGenerateReport = useCallback(() => {
     if (!user) {
         toast({ title: "User not found", description: "Please log in to generate a report.", variant: "destructive" });
         return;
@@ -215,20 +218,20 @@ function ReportingPage() {
     setGeneratedReport(reportParts.join('\n'));
     setReportCardCollapsed(false);
     toast({ title: "Report Generated", description: "The report has been successfully generated." });
-  };
+  }, [user, clientInfoList, agentStats, toast]);
   
-  const handleClearReport = () => setGeneratedReport('');
+  const handleClearReport = useCallback(() => setGeneratedReport(''), []);
 
-  const handleCopyReport = () => {
+  const handleCopyReport = useCallback(() => {
       if (!generatedReport) {
           toast({ title: "Nothing to copy", description: "Generate a report first.", variant: "destructive" });
           return;
       }
       navigator.clipboard.writeText(generatedReport);
       toast({ title: "Report Copied", description: "The report has been copied to your clipboard." });
-  }
+  }, [generatedReport, toast]);
 
-  const handleExportJson = () => {
+  const handleExportJson = useCallback(() => {
       if (!user || clientInfoList.every(c => !c.conversationSummary.trim() && !c.planForTomorrow.trim())) {
           toast({ title: "No data to export", description: "Please fill in client info first.", variant: "destructive"});
           return;
@@ -245,11 +248,11 @@ function ReportingPage() {
       link.download = `report_${user.name}_${new Date().toISOString().split('T')[0]}.json`;
       link.click();
       toast({ title: "JSON Exported", description: "The report data has been exported." });
-  };
+  }, [user, clientInfoList, agentStats, toast]);
   
-  const handleImportJson = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportJson = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      if (!file) return;
+      if (!file || !user) return;
 
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -257,7 +260,7 @@ function ReportingPage() {
               const text = e.target?.result;
               if (typeof text === 'string') {
                   const data = JSON.parse(text);
-                  if (data.agent && data.clients && data.agent === user?.name) {
+                  if (data.agent && data.clients && data.agent === user.name) {
                       const importedClients = data.clients.map((c: any, i: number) => ({...c, id: c.id || new Date().getTime().toString() + i, isCollapsed: false}));
                       setClientInfoList(importedClients);
                       saveReportData(importedClients);
@@ -272,7 +275,7 @@ function ReportingPage() {
       };
       reader.readAsText(file);
       event.target.value = ''; // Reset input
-  };
+  }, [user, saveReportData, toast]);
   
   if (authLoading || dataLoading || !user) {
     return (
