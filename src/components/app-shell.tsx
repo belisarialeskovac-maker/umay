@@ -82,15 +82,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon" className="border-r">
-        <SidebarHeader>
-          <div className="flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-8 text-primary">
-              <rect width="7" height="9" x="3" y="3" rx="1"></rect>
-              <rect width="7" height="5" x="14" y="3" rx="1"></rect>
-              <rect width="7" height="9" x="14" y="12" rx="1"></rect>
-              <rect width="7" height="5" x="3" y="16" rx="1"></rect>
-            </svg>
-            <h1 className="text-xl font-semibold text-foreground group-data-[collapsible=icon]:hidden">Dashboard</h1>
+        <SidebarHeader className='p-2'>
+          <div className="flex items-center gap-3 p-2 group-data-[collapsible=icon]:justify-center">
+            <Avatar className="size-10">
+              <AvatarImage src="https://placehold.co/40x40.png" alt="User Avatar" data-ai-hint="person portrait" />
+              <AvatarFallback>{userInitials}</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+              <span className="text-sm font-semibold text-foreground">{user.name}</span>
+              <span className="text-xs text-muted-foreground">{user.email}</span>
+            </div>
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -110,35 +111,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )})}
           </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter className="flex flex-col gap-4">
+        <SidebarFooter>
           <SidebarMenu>
+             <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Settings">
+                <Link href="#">
+                  <Settings />
+                  <span>Settings</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip={settingsNav.label}>
-                <Link href={settingsNav.href}>
-                  <settingsNav.icon />
-                  <span>{settingsNav.label}</span>
+              <SidebarMenuButton asChild tooltip="Logout" onClick={logout}>
+                <Link href="#">
+                  <LogOut />
+                  <span>Logout</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
-          <SidebarSeparator />
-          <div className="p-2">
-            <div className="flex items-center justify-between group-data-[collapsible=icon]:justify-center">
-              <div className="flex items-center gap-3">
-                <Avatar className="size-8">
-                  <AvatarImage src="https://placehold.co/40x40.png" alt="User Avatar" data-ai-hint="person portrait" />
-                  <AvatarFallback>{userInitials}</AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-                  <span className="text-sm font-semibold text-foreground">{user.name}</span>
-                  <span className="text-xs text-muted-foreground">{user.email}</span>
-                </div>
-              </div>
-              <Button variant="ghost" size="icon" className="group-data-[collapsible=icon]:hidden" onClick={logout}>
-                <LogOut className="size-4" />
-              </Button>
-            </div>
-          </div>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
