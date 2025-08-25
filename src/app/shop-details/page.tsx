@@ -624,7 +624,7 @@ function ShopDetailsPage() {
                 <TableHead>KYC Completed</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Details</TableHead>
-                {canManage && <TableHead>Actions</TableHead>}
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -639,19 +639,21 @@ function ShopDetailsPage() {
                     <Badge variant={client.status === 'Active' ? 'default' : client.status === 'In Process' || client.status === 'Inactive' ? 'secondary' : 'destructive'}>{client.status}</Badge>
                   </TableCell>
                   <TableCell className="max-w-[200px] truncate">{client.clientDetails}</TableCell>
-                  {canManage && (
                   <TableCell>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuItem onClick={() => openEditDialog(client)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => openDeleteDialog(client)} className="text-red-600"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                                {canManage && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => openDeleteDialog(client)} className="text-red-600"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                                    </>
+                                )}
                             </DropdownMenuContent>
                         </DropdownMenu>
                    </TableCell>
-                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -697,7 +699,7 @@ function ShopDetailsPage() {
                     <FormField control={editForm.control} name="agent" render={({ field }) => (
                         <FormItem>
                         <FormLabel>Agent</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={user?.role !== 'Admin' && user?.role !== 'Superadmin'}>
                             <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
                             <SelectContent>{displayAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}</SelectContent>
                         </Select>
