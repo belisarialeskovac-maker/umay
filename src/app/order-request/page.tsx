@@ -1,13 +1,13 @@
 
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Check, X, Hourglass, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react"
+import { Check, X, Hourglass, ThumbsUp, ThumbsDown, Loader2, MoreHorizontal, Trash2, Edit } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc, deleteDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button"
 import {
@@ -19,6 +19,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Form,
   FormControl,
@@ -76,6 +94,9 @@ const formSchema = z.object({
 
 function OrderRequestPage() {
   const [open, setOpen] = useState(false)
+  const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+
   const { orders, agents, clients, loading: dataLoading } = useData();
   const { toast } = useToast()
 
@@ -141,6 +162,29 @@ function OrderRequestPage() {
     }
   }
 
+  const handleDeleteOrder = useCallback(async () => {
+    if (!orderToDelete) return;
+    try {
+      await deleteDoc(doc(db, "orders", orderToDelete.id));
+      toast({
+        title: "Order Deleted",
+        description: `Order for ${orderToDelete.shopId} has been deleted.`,
+        variant: "destructive"
+      });
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      toast({ title: "Error", description: "Failed to delete order.", variant: "destructive" });
+    }
+    setDeleteAlertOpen(false);
+    setOrderToDelete(null);
+  }, [orderToDelete, toast]);
+
+  const openDeleteDialog = (order: Order) => {
+    setOrderToDelete(order);
+    setDeleteAlertOpen(true);
+  };
+
+
   const renderOrderTable = (status: OrderStatus) => {
     const filteredOrders = orders.filter(order => order.status === status);
 
@@ -180,19 +224,33 @@ function OrderRequestPage() {
                 <TableCell>{order.location}</TableCell>
                 <TableCell>${order.price.toFixed(2)}</TableCell>
                 <TableCell>{order.remarks || 'N/A'}</TableCell>
-                <TableCell className="flex gap-2">
-                    {order.status === 'Pending' && (
-                        <>
-                            <Button size="sm" variant="outline" onClick={() => updateOrderStatus(order.id, 'Approved')}><Check className="mr-2 h-4 w-4" />Approve</Button>
-                            <Button size="sm" variant="destructive" onClick={() => updateOrderStatus(order.id, 'Rejected')}><X className="mr-2 h-4 w-4" />Reject</Button>
-                        </>
-                    )}
-                    {order.status === 'Approved' && (
-                        <Button size="sm" variant="destructive" onClick={() => updateOrderStatus(order.id, 'Rejected')}><X className="mr-2 h-4 w-4" />Reject</Button>
-                    )}
-                    {order.status === 'Rejected' && (
-                        <Button size="sm" variant="outline" onClick={() => updateOrderStatus(order.id, 'Approved')}><Check className="mr-2 h-4 w-4" />Approve</Button>
-                    )}
+                <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                         {order.status !== 'Approved' && (
+                            <DropdownMenuItem onClick={() => updateOrderStatus(order.id, 'Approved')}>
+                               <Check className="mr-2 h-4 w-4" /> Approve
+                            </DropdownMenuItem>
+                         )}
+                         {order.status !== 'Rejected' && (
+                            <DropdownMenuItem onClick={() => updateOrderStatus(order.id, 'Rejected')}>
+                                <X className="mr-2 h-4 w-4" /> Reject
+                            </DropdownMenuItem>
+                         )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => openDeleteDialog(order)} className="text-red-600">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          <span>Delete</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}
@@ -364,6 +422,21 @@ function OrderRequestPage() {
           {renderOrderTable("Rejected")}
         </TabsContent>
       </Tabs>
+      
+      <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the order record for {orderToDelete?.shopId}.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteOrder}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </div>
   )
 }
