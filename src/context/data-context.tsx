@@ -188,7 +188,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     const handleInitialLoad = () => {
         loadedCount++;
-        if (loadedCount === totalCollections) {
+        if (loadedCount >= totalCollections) {
             setLoading(false);
         }
     }

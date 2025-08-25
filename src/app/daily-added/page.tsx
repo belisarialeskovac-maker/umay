@@ -81,7 +81,7 @@ const formSchema = z.object({
 
 function DailyAddedPage() {
   const { user, loading: authLoading } = useAuth();
-  const { agents, dailyAddedClients, loading: dataLoading } = useData();
+  const { agents, dailyAddedClients, clients: allShops, loading: dataLoading } = useData();
 
   const [pastedDetails, setPastedDetails] = useState('');
   const [isAddingClient, setIsAddingClient] = useState(false);
@@ -146,7 +146,7 @@ function DailyAddedPage() {
 
   useEffect(() => {
     calculateStats();
-  }, [calculateStats, visibleClients]);
+  }, [calculateStats]);
 
   const ageData = useMemo(() => {
     const ageGroups = { '18-25': 0, '26-35': 0, '36-45': 0, '46-55': 0, '56+': 0, 'Unknown': 0 };
@@ -196,16 +196,23 @@ function DailyAddedPage() {
         }
         
         if (!name || age < 18 || !location || !work) throw new Error("Invalid or incomplete details parsed.");
+
+        // Check for duplicates in the main clients/shops collection
+        const isDuplicate = allShops.some(shop => shop.clientName.toLowerCase() === name.toLowerCase());
+        if (isDuplicate) {
+            throw new Error(`Client "${name}" is already a registered shop and cannot be added again.`);
+        }
+
         const newClientData = { name, age, location, work, assignedAgent: user.name, date: new Date() };
         await addDoc(collection(db, 'dailyAddedClients'), newClientData);
         toast({ title: 'Client Added', description: `${name} has been successfully added.`});
         setPastedDetails('');
     } catch (error: any) {
-        toast({ title: 'Parsing Failed', description: error.message, variant: 'destructive'});
+        toast({ title: 'Client Not Added', description: error.message, variant: 'destructive'});
     } finally {
         setIsAddingClient(false);
     }
-  }, [isAddingClient, pastedDetails, user, toast]);
+  }, [isAddingClient, pastedDetails, user, toast, allShops]);
 
   const onEditSubmit = useCallback(async (values: z.infer<typeof formSchema>) => {
     if (!clientToEdit) return;
