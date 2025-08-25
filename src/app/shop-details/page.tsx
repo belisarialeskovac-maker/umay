@@ -76,7 +76,7 @@ import withAuth from "@/components/with-auth"
 import type { Client } from "@/context/data-context"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
-const clientStatus = ["In Process", "Active", "Eliminated"] as const;
+const clientStatus = ["In Process", "Active", "Inactive", "Eliminated"] as const;
 
 const formSchema = z.object({
   shopId: z.string().min(1, "Shop ID is required."),
@@ -605,7 +605,7 @@ function ShopDetailsPage() {
                   <TableCell>{client.agent}</TableCell>
                   <TableCell>{format(client.kycCompletedDate, "PPP")}</TableCell>
                   <TableCell>
-                    <Badge variant={client.status === 'Active' ? 'default' : client.status === 'In Process' ? 'secondary' : 'destructive'}>{client.status}</Badge>
+                    <Badge variant={client.status === 'Active' ? 'default' : client.status === 'In Process' || client.status === 'Inactive' ? 'secondary' : 'destructive'}>{client.status}</Badge>
                   </TableCell>
                   <TableCell className="max-w-[200px] truncate">{client.clientDetails}</TableCell>
                   {canManage && (

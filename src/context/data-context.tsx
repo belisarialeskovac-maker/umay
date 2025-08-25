@@ -25,7 +25,7 @@ export type Client = {
     clientName: string;
     agent: string;
     kycCompletedDate: Date;
-    status: "In Process" | "Active" | "Eliminated";
+    status: "In Process" | "Active" | "Inactive" | "Eliminated";
     clientDetails: string;
 }
 
