@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -46,6 +47,15 @@ export default function LoginPage() {
   const { toast } = useToast()
   const auth = getAuth(app)
   const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      // If user is already logged in, redirect them, but show loading screen first.
+      setShowLoadingScreen(true);
+    }
+  }, [user, authLoading, router]);
+
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -63,8 +73,8 @@ export default function LoginPage() {
         title: "Login Successful",
         description: "Welcome back!",
       })
-      setShowLoadingScreen(true);
-      // The redirect is now handled by the LoadingScreen component
+      // The onAuthStateChanged listener will handle setting the user,
+      // which triggers the useEffect to show the loading screen.
     } catch (error: any) {
       console.error("Login failed:", error)
       toast({
@@ -80,7 +90,8 @@ export default function LoginPage() {
     return <LoadingScreen />;
   }
 
-  if (authLoading || user) {
+  // Prevent login page from flashing while auth state is being determined
+  if (authLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -88,67 +99,74 @@ export default function LoginPage() {
     );
   }
 
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-        <div className="w-full max-w-md">
-            <Card>
-                <CardHeader className="text-center">
-                     <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                        <Boxes className="h-8 w-8 text-primary" />
-                    </div>
-                    <CardTitle className="text-3xl font-bold">Welcome Back</CardTitle>
-                    <CardDescription>
-                        Enter your credentials to access your account.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                        control={form.control}
-                        name="email"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                                <Input placeholder="m@example.com" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="password"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Password</FormLabel>
-                            <FormControl>
-                                <Input type="password" placeholder="••••••••" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <Button type="submit" className="w-full" disabled={isSubmitting}>
-                        {isSubmitting ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Logging in...
-                            </>
-                        ) : "Log in"}
-                        </Button>
-                    </form>
-                    </Form>
-                    <div className="mt-6 text-center text-sm">
-                    Don&apos;t have an account?{" "}
-                    <Link href="/signup" className="font-semibold text-primary hover:underline">
-                        Sign up
-                    </Link>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-    </div>
-  )
+  // If not loading and no user, show the login form
+  if (!user) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
+          <div className="w-full max-w-md">
+              <Card>
+                  <CardHeader className="text-center">
+                       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                          <Boxes className="h-8 w-8 text-primary" />
+                      </div>
+                      <CardTitle className="text-3xl font-bold">Welcome Back</CardTitle>
+                      <CardDescription>
+                          Enter your credentials to access your account.
+                      </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                      <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                          <FormField
+                          control={form.control}
+                          name="email"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                  <Input placeholder="m@example.com" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                          />
+                          <FormField
+                          control={form.control}
+                          name="password"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Password</FormLabel>
+                              <FormControl>
+                                  <Input type="password" placeholder="••••••••" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                          />
+                          <Button type="submit" className="w-full" disabled={isSubmitting}>
+                          {isSubmitting ? (
+                              <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Logging in...
+                              </>
+                          ) : "Log in"}
+                          </Button>
+                      </form>
+                      </Form>
+                      <div className="mt-6 text-center text-sm">
+                      Don&apos;t have an account?{" "}
+                      <Link href="/signup" className="font-semibold text-primary hover:underline">
+                          Sign up
+                      </Link>
+                      </div>
+                  </CardContent>
+              </Card>
+          </div>
+      </div>
+    )
+  }
+
+  // If user exists but loading screen is not shown yet, this will be null
+  // This state prevents a flash of nothing before the loading screen appears.
+  return null;
 }
