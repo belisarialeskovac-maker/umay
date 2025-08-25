@@ -5,11 +5,12 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, ArrowDownToLine, ArrowUpFromLine, Loader2, Trophy } from "lucide-react";
+import { Users, ArrowDownToLine, ArrowUpFromLine, Loader2, Trophy, Store, UserPlus, Medal } from "lucide-react";
 import { format, getMonth, getYear, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import withAuth from '@/components/with-auth';
 import { useAuth } from '@/context/auth-context';
 import { useData } from '@/context/data-context';
+import { cn } from '@/lib/utils';
 import type { Agent } from '@/context/data-context';
 
 type LeaderboardEntry = {
@@ -107,33 +108,45 @@ function Home() {
     );
   }
 
-  const renderLeaderboard = (title: string, data: LeaderboardEntry[], isCurrency = false) => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Trophy className="text-yellow-500"/> {title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Rank</TableHead>
-              <TableHead>Agent</TableHead>
-              <TableHead>Total</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.map((entry, index) => (
-              <TableRow key={index}>
-                <TableCell>{index + 1}</TableCell>
-                <TableCell>{entry.agentName}</TableCell>
-                <TableCell>{isCurrency ? `$${entry.value.toFixed(2)}` : entry.value}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  );
+  const renderLeaderboard = (title: string, data: LeaderboardEntry[], isCurrency = false, icon: React.ReactNode) => {
+      const getMedalColor = (rank: number) => {
+        if (rank === 0) return "text-yellow-500"; // Gold
+        if (rank === 1) return "text-gray-400";  // Silver
+        if (rank === 2) return "text-yellow-700"; // Bronze
+        return "text-muted-foreground";
+    };
+    
+    return (
+        <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2">{icon} {title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <Table>
+            <TableHeader>
+                <TableRow>
+                <TableHead className="w-[50px]">Rank</TableHead>
+                <TableHead>Agent</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {data.map((entry, index) => (
+                <TableRow key={index} className={cn(index < 3 && "bg-accent/50")}>
+                    <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                           {index < 3 ? <Medal className={cn("h-5 w-5", getMedalColor(index))} /> : <span className="w-5 text-center">{index + 1}</span>}
+                        </div>
+                    </TableCell>
+                    <TableCell>{entry.agentName}</TableCell>
+                    <TableCell className="text-right">{isCurrency ? `$${entry.value.toFixed(2)}` : entry.value}</TableCell>
+                </TableRow>
+                ))}
+            </TableBody>
+            </Table>
+        </CardContent>
+        </Card>
+  )};
 
   return (
     <div className="w-full h-full space-y-6">
@@ -202,9 +215,9 @@ function Home() {
       <div>
         <h2 className="text-2xl font-bold text-foreground mb-4">Performance Leaderboards</h2>
         <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
-          {renderLeaderboard("Top 10 Agent Deposits", topDeposits, true)}
-          {renderLeaderboard("Top 10 Shop Open", topShops)}
-          {renderLeaderboard("Top 10 Client Added", topClientsAdded)}
+          {renderLeaderboard("Top 10 Agent Deposits", topDeposits, true, <Trophy className="text-yellow-500" />)}
+          {renderLeaderboard("Top 10 Shop Open", topShops, false, <Store className="text-blue-500" />)}
+          {renderLeaderboard("Top 10 Client Added", topClientsAdded, false, <UserPlus className="text-green-500" />)}
         </div>
       </div>
 
