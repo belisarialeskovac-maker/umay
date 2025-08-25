@@ -6,9 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
-import Image from "next/image"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -31,6 +29,7 @@ import { useToast } from "@/hooks/use-toast"
 import { app } from "@/lib/firebase"
 import { useAuth } from "@/context/auth-context"
 import { Boxes, Loader2 } from "lucide-react"
+import LoadingScreen from "@/components/loading-screen"
 
 const formSchema = z.object({
   email: z.string().email({
@@ -43,17 +42,10 @@ const formSchema = z.object({
 
 export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showLoadingScreen, setShowLoadingScreen] = useState(false)
   const { toast } = useToast()
-  const router = useRouter()
   const auth = getAuth(app)
   const { user, loading: authLoading } = useAuth()
-
-  useEffect(() => {
-    if (!authLoading && user) {
-      router.push('/')
-    }
-  }, [user, authLoading, router])
-
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -71,7 +63,8 @@ export default function LoginPage() {
         title: "Login Successful",
         description: "Welcome back!",
       })
-      // The redirect is handled by the useEffect and AuthProvider
+      setShowLoadingScreen(true);
+      // The redirect is now handled by the LoadingScreen component
     } catch (error: any) {
       console.error("Login failed:", error)
       toast({
@@ -79,19 +72,21 @@ export default function LoginPage() {
         description: error.message || "An unexpected error occurred.",
         variant: "destructive",
       })
-    } finally {
       setIsSubmitting(false)
-    }
+    } 
   }
   
+  if (showLoadingScreen) {
+    return <LoadingScreen />;
+  }
+
   if (authLoading || user) {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
+      <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
-
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
