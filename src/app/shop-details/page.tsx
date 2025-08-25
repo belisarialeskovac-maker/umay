@@ -1,14 +1,15 @@
 
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { format, getMonth, getYear, setMonth, setYear } from "date-fns"
-import { CalendarIcon, Loader2, MoreHorizontal, Edit, Trash2, Search } from "lucide-react"
+import { format, getMonth, getYear, parseISO, isValid } from "date-fns"
+import { CalendarIcon, Loader2, MoreHorizontal, Edit, Trash2, Search, Upload } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch, query, where, getDocs } from "firebase/firestore";
+import Papa from "papaparse";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -108,6 +109,8 @@ function ShopDetailsPage() {
   const [monthFilter, setMonthFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
   const [newBulkStatus, setNewBulkStatus] = useState<typeof clientStatus[number] | ''>('');
+
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
 
   const { clients: allClients, agents, loading: dataLoading } = useData();
@@ -279,6 +282,86 @@ function ShopDetailsPage() {
     setNewBulkStatus('');
   }, [selectedClients, newBulkStatus, toast]);
 
+  const handleCsvUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+        return;
+    }
+
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+            const requiredHeaders = ["shopId", "clientName", "agent", "kycCompletedDate", "status", "clientDetails"];
+            const headers = results.meta.fields || [];
+
+            if (!requiredHeaders.every(h => headers.includes(h))) {
+                toast({
+                    title: "Invalid CSV Format",
+                    description: `CSV must contain the headers: ${requiredHeaders.join(', ')}`,
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            const clientsData = results.data as any[];
+            const batch = writeBatch(db);
+            let importedCount = 0;
+            let skippedCount = 0;
+
+            const existingShopIds = new Set(allClients.map(c => c.shopId));
+
+            for (const clientData of clientsData) {
+                if (existingShopIds.has(clientData.shopId)) {
+                    skippedCount++;
+                    continue;
+                }
+
+                const kycDate = parseISO(clientData.kycCompletedDate);
+                if (!isValid(kycDate)) {
+                    skippedCount++;
+                    continue;
+                }
+
+                const newClient = {
+                    ...clientData,
+                    kycCompletedDate: kycDate,
+                };
+                
+                const clientRef = doc(collection(db, "clients"));
+                batch.set(clientRef, newClient);
+                importedCount++;
+            }
+            
+            try {
+                await batch.commit();
+                toast({
+                    title: "Import Complete",
+                    description: `${importedCount} shops imported successfully. ${skippedCount} shops were skipped due to duplicate IDs or invalid data.`,
+                });
+            } catch (error) {
+                toast({
+                    title: "Import Error",
+                    description: "An error occurred during the batch import.",
+                    variant: "destructive"
+                });
+            }
+        },
+        error: (error) => {
+            toast({
+                title: "CSV Parsing Error",
+                description: error.message,
+                variant: "destructive"
+            });
+        }
+    });
+
+    if(csvInputRef.current) {
+        csvInputRef.current.value = "";
+    }
+  }, [allClients, toast]);
+
+
   const openEditDialog = useCallback((client: Client) => {
     setClientToEdit(client);
     editForm.reset({
@@ -339,67 +422,80 @@ function ShopDetailsPage() {
           </p>
         </div>
         {canManage && (
-            <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button>Add New Shop</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                <DialogTitle>Add New Shop</DialogTitle>
-                <DialogDescription>
-                    Fill in the details below to add a new shop.
-                </DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField control={form.control} name="shopId" render={({ field }) => (
-                        <FormItem><FormLabel>Shop ID</FormLabel><FormControl><Input placeholder="Enter Shop ID" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="clientName" render={({ field }) => (
-                        <FormItem><FormLabel>Client Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="agent" render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Agent</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                            {displayAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                        </FormItem>
-                    )} />
-                    <FormField control={form.control} name="kycCompletedDate" render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                        <FormLabel>KYC Completed Date</FormLabel>
-                        <Popover><PopoverTrigger asChild><FormControl>
-                            <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>
-                                {field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                        </FormControl></PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent>
-                        </Popover><FormMessage />
-                        </FormItem>
-                    )}/>
-                    <FormField control={form.control} name="status" render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select a status" /></SelectTrigger></FormControl>
-                            <SelectContent>{clientStatus.map((status) => (<SelectItem key={status} value={status}>{status}</SelectItem>))}</SelectContent>
-                        </Select><FormMessage />
-                        </FormItem>
-                    )}/>
-                    <FormField control={form.control} name="clientDetails" render={({ field }) => (
-                        <FormItem><FormLabel>Client Details</FormLabel><FormControl><Textarea placeholder="Enter client details..." {...field} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <DialogFooter><Button type="submit">Add Shop</Button></DialogFooter>
-                </form>
-                </Form>
-            </DialogContent>
-            </Dialog>
+            <div className="flex items-center gap-2">
+                 <Button variant="outline" onClick={() => csvInputRef.current?.click()}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Import CSV
+                </Button>
+                <input
+                    type="file"
+                    ref={csvInputRef}
+                    accept=".csv"
+                    onChange={handleCsvUpload}
+                    className="hidden"
+                />
+                <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>
+                    <Button>Add New Shop</Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                    <DialogTitle>Add New Shop</DialogTitle>
+                    <DialogDescription>
+                        Fill in the details below to add a new shop.
+                    </DialogDescription>
+                    </DialogHeader>
+                    <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField control={form.control} name="shopId" render={({ field }) => (
+                            <FormItem><FormLabel>Shop ID</FormLabel><FormControl><Input placeholder="Enter Shop ID" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="clientName" render={({ field }) => (
+                            <FormItem><FormLabel>Client Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="agent" render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Agent</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                {displayAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="kycCompletedDate" render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                            <FormLabel>KYC Completed Date</FormLabel>
+                            <Popover><PopoverTrigger asChild><FormControl>
+                                <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>
+                                    {field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                            </FormControl></PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent>
+                            </Popover><FormMessage />
+                            </FormItem>
+                        )}/>
+                        <FormField control={form.control} name="status" render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Status</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Select a status" /></SelectTrigger></FormControl>
+                                <SelectContent>{clientStatus.map((status) => (<SelectItem key={status} value={status}>{status}</SelectItem>))}</SelectContent>
+                            </Select><FormMessage />
+                            </FormItem>
+                        )}/>
+                        <FormField control={form.control} name="clientDetails" render={({ field }) => (
+                            <FormItem><FormLabel>Client Details</FormLabel><FormControl><Textarea placeholder="Enter client details..." {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <DialogFooter><Button type="submit">Add Shop</Button></DialogFooter>
+                    </form>
+                    </Form>
+                </DialogContent>
+                </Dialog>
+            </div>
         )}
       </div>
 
