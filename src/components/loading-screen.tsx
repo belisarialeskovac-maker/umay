@@ -128,7 +128,7 @@ export default function LoadingScreen({ onAnimationComplete, userName }: Loading
               />
             </div>
             <p className="text-gray-400 text-sm mt-3 tracking-wide">
-              {userName ? `Welcome back, ${userName}` : "Loading your experience..."}
+              {userName ? `Welcome back, Agent ${userName}` : "Loading your experience..."}
             </p>
           </div>
         </div>
