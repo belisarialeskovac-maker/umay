@@ -1,15 +1,16 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { z } from 'zod';
-import { format, isToday, isThisMonth, getMonth, getYear } from 'date-fns';
-import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays, BarChart, Loader2, MoreHorizontal, Edit, Trash2, Search } from 'lucide-react';
+import { format, isToday, isThisMonth, getMonth, getYear, isValid, parseISO } from 'date-fns';
+import { User, ClipboardList, Calendar, Briefcase, MapPin, UserPlus, TextSearch, TrendingUp, Users, UserCheck as UserCheckIcon, CalendarDays, BarChart, Loader2, MoreHorizontal, Edit, Trash2, Search, Upload } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import Papa from "papaparse";
 
 import { Button } from '@/components/ui/button';
 import {
@@ -70,6 +71,8 @@ import { useData } from '@/context/data-context';
 import withAuth from '@/components/with-auth';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import type { DailyAddedClient as Client, Agent } from '@/context/data-context';
 
 type AgentStats = {
@@ -86,6 +89,12 @@ const formSchema = z.object({
   work: z.string().min(2, "Work is required."),
   assignedAgent: z.string().optional(),
 });
+
+type PreviewRow = {
+    data: any;
+    status: 'Ready to Import' | 'Invalid Data';
+    reason?: string;
+}
 
 function DailyAddedPage() {
   const { user, loading: authLoading } = useAuth();
@@ -108,9 +117,14 @@ function DailyAddedPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
   const [bulkDeleteAlertOpen, setBulkDeleteAlertOpen] = useState(false);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const csvInputRef = useRef<HTMLInputElement>(null);
   
   const editForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -281,6 +295,103 @@ function DailyAddedPage() {
     setBulkDeleteAlertOpen(false);
   }, [selectedClients, toast]);
 
+  const handleCsvUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+            const requiredHeaders = ["name", "age", "location", "work", "agent", "date"];
+            if (!requiredHeaders.every(h => results.meta.fields?.map(f => f.toLowerCase()).includes(h))) {
+                toast({
+                    title: "Invalid CSV Format",
+                    description: `CSV must contain headers: ${requiredHeaders.join(", ")}`,
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            const agentMap = new Map(agents.map(a => [a.name.toLowerCase(), a.name]));
+
+            const validatedData = (results.data as any[]).map(row => {
+                const agentNameLower = row.agent?.toLowerCase();
+                const matchedAgentName = agentMap.get(agentNameLower);
+
+                if (!matchedAgentName) {
+                    return { data: row, status: 'Invalid Data' as const, reason: `Agent '${row.agent}' not found.` };
+                }
+
+                let clientDate = new Date(row.date);
+                 if (!isValid(clientDate)) {
+                    clientDate = parseISO(row.date);
+                }
+
+                if (!isValid(clientDate)) {
+                    return { data: row, status: 'Invalid Data' as const, reason: 'Invalid date format.' };
+                }
+
+                const finalData = {
+                    name: row.name,
+                    age: parseInt(row.age, 10),
+                    location: row.location,
+                    work: row.work,
+                    assignedAgent: matchedAgentName,
+                    date: clientDate,
+                };
+                
+                return { data: finalData, status: 'Ready to Import' as const };
+            });
+
+            setPreviewData(validatedData);
+            setPreviewDialogOpen(true);
+        },
+        error: (error) => {
+            toast({ title: "CSV Parsing Error", description: error.message, variant: "destructive" });
+        }
+    });
+
+    if (csvInputRef.current) {
+        csvInputRef.current.value = "";
+    }
+  }, [agents, toast]);
+
+  const handleConfirmImport = useCallback(async () => {
+    setIsImporting(true);
+    const batch = writeBatch(db);
+    let importedCount = 0;
+    
+    previewData.forEach(row => {
+        if(row.status === 'Ready to Import') {
+            const clientRef = doc(collection(db, "dailyAddedClients"));
+            batch.set(clientRef, row.data);
+            importedCount++;
+        }
+    });
+
+    if (importedCount === 0) {
+        toast({ title: "No Clients to Import", description: "There are no valid new clients to import.", variant: "destructive"});
+        setIsImporting(false);
+        setPreviewDialogOpen(false);
+        return;
+    }
+
+    try {
+        await batch.commit();
+        toast({
+            title: "Import Complete",
+            description: `${importedCount} clients imported successfully.`,
+        });
+    } catch (error) {
+        toast({ title: "Import Error", description: "An error occurred during the batch import.", variant: "destructive" });
+    } finally {
+        setIsImporting(false);
+        setPreviewDialogOpen(false);
+        setPreviewData([]);
+    }
+  }, [previewData, toast]);
+
   const openEditDialog = useCallback((client: Client) => {
     setClientToEdit(client);
     editForm.reset(client);
@@ -314,6 +425,8 @@ function DailyAddedPage() {
   }, []);
 
   const canManage = user?.role === 'Admin' || user?.role === 'Superadmin';
+  const readyToImportCount = useMemo(() => previewData.filter(row => row.status === 'Ready to Import').length, [previewData]);
+
 
   if (authLoading || dataLoading) {
     return (<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>);
@@ -323,6 +436,14 @@ function DailyAddedPage() {
     <div className="w-full h-full">
         <div className="flex justify-between items-center mb-6">
             <div><h1 className="text-3xl font-bold text-foreground">Daily Added Clients</h1><p className="text-muted-foreground mt-1">Track and manage daily client entries and statistics.</p></div>
+            {canManage && (
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={() => csvInputRef.current?.click()}>
+                        <Upload className="mr-2 h-4 w-4" /> Import CSV
+                    </Button>
+                    <input type="file" ref={csvInputRef} accept=".csv" onChange={handleCsvUpload} className="hidden" />
+                </div>
+            )}
         </div>
       
         <Tabs defaultValue="dashboard">
@@ -438,6 +559,50 @@ function DailyAddedPage() {
         <DialogFooter><Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button><Button type="submit">Save Changes</Button></DialogFooter></form></Form></DialogContent></Dialog>
         <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the client record for {clientToDelete?.name}.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteClient}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
         <AlertDialog open={bulkDeleteAlertOpen} onOpenChange={setBulkDeleteAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the selected {selectedClients.length} client records.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleBulkDelete}>Delete All</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+        <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+            <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                    <DialogTitle>CSV Import Preview</DialogTitle>
+                    <DialogDescription>
+                        Review the data to be imported. Invalid rows are automatically excluded.
+                    </DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="h-[60vh] rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Age</TableHead>
+                                <TableHead>Agent</TableHead>
+                                <TableHead>Reason</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {previewData.map((row, index) => (
+                                <TableRow key={index}>
+                                    <TableCell>
+                                        <Badge variant={row.status === 'Ready to Import' ? 'default' : 'destructive'}>
+                                            {row.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>{row.data.name}</TableCell>
+                                    <TableCell>{row.data.age}</TableCell>
+                                    <TableCell>{row.data.assignedAgent || row.data.agent}</TableCell>
+                                    <TableCell>{row.reason || 'N/A'}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+                <DialogFooter>
+                    <Button variant="ghost" onClick={() => setPreviewDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={handleConfirmImport} disabled={isImporting || readyToImportCount === 0}>
+                        {isImporting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Importing...</> : `Confirm Import (${readyToImportCount})`}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
   );
 }
