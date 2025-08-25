@@ -310,13 +310,13 @@ function ProfilePage() {
                 <CardContent className="p-4">
                     <Tabs defaultValue="overview">
                         <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 lg:grid-cols-7">
-                            <TabsTrigger value="overview">Overview</TabsTrigger>
-                            <TabsTrigger value="clients">Clients</TabsTrigger>
-                            <TabsTrigger value="transactions">Transactions</TabsTrigger>
-                            <TabsTrigger value="inventory">Inventory</TabsTrigger>
-                            <TabsTrigger value="orders">Orders</TabsTrigger>
-                            <TabsTrigger value="discipline">Discipline</TabsTrigger>
-                            <TabsTrigger value="rewards">Rewards</TabsTrigger>
+                            <TabsTrigger value="overview"><Users className="mr-2 h-4 w-4" />Overview</TabsTrigger>
+                            <TabsTrigger value="clients"><Users className="mr-2 h-4 w-4" />Clients</TabsTrigger>
+                            <TabsTrigger value="transactions"><Activity className="mr-2 h-4 w-4" />Transactions</TabsTrigger>
+                            <TabsTrigger value="inventory"><Boxes className="mr-2 h-4 w-4" />Inventory</TabsTrigger>
+                            <TabsTrigger value="orders"><ShoppingCart className="mr-2 h-4 w-4" />Orders</TabsTrigger>
+                            <TabsTrigger value="discipline"><ShieldAlert className="mr-2 h-4 w-4" />Discipline</TabsTrigger>
+                            <TabsTrigger value="rewards"><Award className="mr-2 h-4 w-4" />Rewards</TabsTrigger>
                         </TabsList>
                         <TabsContent value="overview" className="pt-6">
                             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
