@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
-import { Loader2, FileText, Video, Boxes, ClipboardList, User, Banknote, Users, Activity, ShoppingCart, ShieldAlert, Award } from "lucide-react"
+import { Loader2, FileText, Video, Boxes, ClipboardList, User, Banknote, Users, Activity, ShoppingCart, ShieldAlert, Award, ArrowDownToLine, ArrowUpFromLine } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc } from "firebase/firestore"
 import Link from "next/link"
@@ -381,10 +381,11 @@ function ProfilePage() {
             <Card>
                 <CardContent className="p-4">
                     <Tabs defaultValue="overview">
-                        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 lg:grid-cols-7">
+                        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-4 lg:grid-cols-8">
                             <TabsTrigger value="overview"><User className="mr-2 h-4 w-4" />Overview</TabsTrigger>
                             <TabsTrigger value="clients"><Users className="mr-2 h-4 w-4" />Clients</TabsTrigger>
-                            <TabsTrigger value="transactions"><Activity className="mr-2 h-4 w-4" />Transactions</TabsTrigger>
+                            <TabsTrigger value="deposits"><ArrowDownToLine className="mr-2 h-4 w-4" />Deposits</TabsTrigger>
+                            <TabsTrigger value="withdrawals"><ArrowUpFromLine className="mr-2 h-4 w-4" />Withdrawals</TabsTrigger>
                             <TabsTrigger value="inventory"><Boxes className="mr-2 h-4 w-4" />Inventory</TabsTrigger>
                             <TabsTrigger value="orders"><ShoppingCart className="mr-2 h-4 w-4" />Orders</TabsTrigger>
                             <TabsTrigger value="discipline"><ShieldAlert className="mr-2 h-4 w-4" />Discipline</TabsTrigger>
@@ -449,7 +450,7 @@ function ProfilePage() {
                             </Table>
                              {renderPaginationControls(clientsTotalPages, clientsPage, setClientsPage)}
                         </TabsContent>
-                        <TabsContent value="transactions" className="pt-4 space-y-6">
+                        <TabsContent value="deposits" className="pt-4 space-y-6">
                             <div>
                                 <h3 className="text-lg font-medium mb-2 flex items-center"><Activity className="mr-2 h-5 w-5 text-green-500"/>Deposits</h3>
                                 <Table>
@@ -462,7 +463,9 @@ function ProfilePage() {
                                 </Table>
                                 {renderPaginationControls(depositsTotalPages, depositsPage, setDepositsPage)}
                             </div>
-                            <div>
+                        </TabsContent>
+                        <TabsContent value="withdrawals" className="pt-4 space-y-6">
+                             <div>
                                 <h3 className="text-lg font-medium mb-2 flex items-center"><Activity className="mr-2 h-5 w-5 text-red-500"/>Withdrawals</h3>
                                 <Table>
                                     <TableHeader><TableRow><TableHead>Shop ID</TableHead><TableHead>Client</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
