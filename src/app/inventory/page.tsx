@@ -25,55 +25,41 @@ function InventoryPage() {
   const { user, loading: authLoading } = useAuth();
   const { inventory: allDevices, agents, loading: dataLoading } = useData();
   
-  const [userVisibleDevices, setUserVisibleDevices] = useState<DeviceInventory[]>([]);
-  const [filteredDevices, setFilteredDevices] = useState<DeviceInventory[]>([])
-  const [agentStats, setAgentStats] = useState<AgentStats>({})
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState("inventory")
   const { toast } = useToast()
 
-  useEffect(() => {
-    if (!dataLoading && user) {
-      const devices = user.role === 'Agent' 
-        ? allDevices.filter(d => d.agent === user.name)
-        : allDevices;
-      setUserVisibleDevices(devices);
-    } else if (!dataLoading) {
-      setUserVisibleDevices(allDevices);
+  const userVisibleDevices = useMemo(() => {
+    if (dataLoading) return [];
+    if (user?.role === 'Agent') {
+      return allDevices.filter(d => d.agent === user.name);
     }
+    return allDevices;
   }, [allDevices, user, dataLoading]);
   
   const agentNames = useMemo(() => agents.map(a => a.name), [agents]);
+  
+  const agentStats = useMemo(() => {
+    const stats: AgentStats = {};
+    userVisibleDevices.forEach((device) => {
+        stats[device.agent] = (stats[device.agent] || 0) + 1;
+    });
+    return stats;
+  }, [userVisibleDevices]);
 
-  const updateAgentStats = useCallback((deviceData: DeviceInventory[]) => {
-    const stats: AgentStats = {}
-    deviceData.forEach((device) => {
-      stats[device.agent] = (stats[device.agent] || 0) + 1
-    })
-    setAgentStats(stats)
-  }, []);
-
-  useEffect(() => {
-    const devicesToProcess = userVisibleDevices;
-    
+  const filteredDevices = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
     if (term === "") {
-      setFilteredDevices(devicesToProcess);
-    } else {
-      const filtered = devicesToProcess.filter((device) =>
-        Object.values(device).some(value => 
-          String(value).toLowerCase().includes(term)
-        )
-      );
-      setFilteredDevices(filtered);
+      return userVisibleDevices;
     }
-    
-    // Only admins should see stats for all devices, agents see their own.
-    updateAgentStats(devicesToProcess);
+    return userVisibleDevices.filter((device) =>
+      Object.values(device).some(value => 
+        String(value).toLowerCase().includes(term)
+      )
+    );
+  }, [searchTerm, userVisibleDevices]);
 
-  }, [searchTerm, userVisibleDevices, updateAgentStats]);
-
-  const addDevice = async (device: Omit<DeviceInventory, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const addDevice = useCallback(async (device: Omit<DeviceInventory, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) {
         toast({title: "Error", description: "You must be logged in.", variant: "destructive"});
         return false;
@@ -125,9 +111,9 @@ function InventoryPage() {
       })
       return false
     }
-  }
+  }, [user, toast]);
 
-  const updateDevice = async (id: string, updatedDeviceData: Partial<Omit<DeviceInventory, 'id'>>) => {
+  const updateDevice = useCallback(async (id: string, updatedDeviceData: Partial<Omit<DeviceInventory, 'id'>>) => {
     try {
       if (updatedDeviceData.imei) {
         const q = query(collection(db, "inventory"), where("imei", "==", updatedDeviceData.imei));
@@ -163,9 +149,9 @@ function InventoryPage() {
       })
       return false
     }
-  }
+  }, [toast]);
 
-  const deleteDevice = async (id: string) => {
+  const deleteDevice = useCallback(async (id: string) => {
     try {
       await deleteDoc(doc(db, "inventory", id));
       toast({
@@ -182,7 +168,7 @@ function InventoryPage() {
       })
       return false
     }
-  }
+  }, [toast]);
 
   if (authLoading || dataLoading) {
     return (
