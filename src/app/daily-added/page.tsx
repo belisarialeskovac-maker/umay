@@ -64,7 +64,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/context/auth-context';
 import { useData } from '@/context/data-context';
@@ -452,16 +452,60 @@ function DailyAddedPage() {
                 <div className="space-y-8">
                     <div>
                         <h2 className="text-xl font-semibold mb-4 flex items-center"><TrendingUp className="mr-2 h-5 w-5" /> Overall Performance</h2>
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                            <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Daily Clients</CardTitle><User className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{dailyCount}</div><p className="text-xs text-muted-foreground">Clients added today</p></CardContent></Card>
-                            <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Monthly Clients</CardTitle><CalendarDays className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{monthlyCount}</div><p className="text-xs text-muted-foreground">Clients added this month</p></CardContent></Card>
-                            <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Clients</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalCount}</div><p className="text-xs text-muted-foreground">All-time client count</p></CardContent></Card>
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                            <Card className="hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">Daily Clients</CardTitle>
+                                    <User className="h-4 w-4 text-muted-foreground" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-4xl font-bold">{dailyCount}</div>
+                                    <p className="text-xs text-muted-foreground">Clients added today</p>
+                                </CardContent>
+                            </Card>
+                            <Card className="hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Clients</CardTitle>
+                                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-4xl font-bold">{monthlyCount}</div>
+                                    <p className="text-xs text-muted-foreground">Clients added this month</p>
+                                </CardContent>
+                            </Card>
+                             <Card className="hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Clients</CardTitle>
+                                    <Users className="h-4 w-4 text-muted-foreground" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-4xl font-bold text-primary">{totalCount}</div>
+                                    <p className="text-xs text-muted-foreground">All-time client count</p>
+                                </CardContent>
+                            </Card>
                         </div>
                         {user?.role !== 'Agent' && (<>
-                            <h2 className="text-xl font-semibold my-4 flex items-center"><UserCheckIcon className="mr-2 h-5 w-5" /> Agent Performance</h2>
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            <h2 className="text-xl font-semibold my-6 flex items-center"><UserCheckIcon className="mr-2 h-5 w-5" /> Agent Performance</h2>
+                            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                                 {Object.keys(agentStats).length > 0 ? Object.entries(agentStats).map(([agent, stats]) => (
-                                    <Card key={agent}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{agent}</CardTitle><UserCheckIcon className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats.daily}</div><p className="text-xs text-muted-foreground">Daily Clients</p><div className="text-2xl font-bold mt-2">{stats.monthly}</div><p className="text-xs text-muted-foreground">Monthly Clients</p></CardContent></Card>
+                                    <Card key={agent} className="hover:border-primary/50 hover:shadow-md transition-all duration-300">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-base font-medium flex items-center justify-between">
+                                                {agent}
+                                                <UserCheckIcon className="h-4 w-4 text-muted-foreground" />
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="flex flex-col gap-2">
+                                            <div>
+                                                <div className="text-2xl font-bold">{stats.daily}</div>
+                                                <p className="text-xs text-muted-foreground">Daily Clients</p>
+                                            </div>
+                                            <div>
+                                                <div className="text-2xl font-bold">{stats.monthly}</div>
+                                                <p className="text-xs text-muted-foreground">Monthly Clients</p>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
                                 )) : <p className="text-muted-foreground text-sm col-span-full">No agent activity yet.</p>}
                             </div>
                         </>)}
@@ -469,7 +513,11 @@ function DailyAddedPage() {
                     <div>
                         <h2 className="text-xl font-semibold mb-4 flex items-center"><TextSearch className="mr-2 h-5 w-5" /> Parsing Area</h2>
                         <div className='space-y-4'>
-                            <div className="space-y-2"><Label htmlFor="pasted-details">1. Paste Client Details Here</Label><Textarea id="pasted-details" placeholder="e.g.&#10;Client Name: Jason&#10;Age: 40&#10;Work: Captain in a cruise ship&#10;Location: UAE" className='min-h-[150px] mt-2' value={pastedDetails} onChange={(e) => setPastedDetails(e.target.value)} /></div>
+                            <div className="space-y-2"><Label htmlFor="pasted-details">1. Paste Client Details Here</Label><Textarea id="pasted-details" placeholder="e.g.
+Client Name: Jason
+Age: 40
+Work: Captain in a cruise ship
+Location: UAE" className='min-h-[150px] mt-2' value={pastedDetails} onChange={(e) => setPastedDetails(e.target.value)} /></div>
                             <Button onClick={handleAddClient} disabled={isAddingClient} className='w-full'>{isAddingClient ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding Client...</>) : (<><UserPlus className="mr-2 h-4 w-4" /> 2. Parse and Add Client</>)}</Button>
                         </div>
                     </div>
@@ -608,3 +656,5 @@ function DailyAddedPage() {
 }
 
 export default withAuth(DailyAddedPage, ['Agent', 'Admin', 'Superadmin']);
+
+    
