@@ -139,25 +139,7 @@ const requiredFields: (keyof FormData)[] = [
   "remarks",
 ]
 
-export default function VideoCallTemplatePage() {
-  const [formData, setFormData] = useState<FormData>(initialFormData);
-  const [isMounted, setIsMounted] = useState(false);
-
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    model: true,
-    client: false,
-    topics: false,
-  })
-  const [progress, setProgress] = useState(0)
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const { toast } = useToast()
-  const pdfRef = useRef<HTMLIFrameElement>(null)
-
-  const isAuthenticityCall = formData.purpose.toLowerCase().includes("authenticity")
-
-  const sections = [
+const sections = [
     {
       id: "model",
       title: "Model Details",
@@ -179,7 +161,26 @@ export default function VideoCallTemplatePage() {
       requiredFields: ["beforeCall", "afterCall", "kidLocation", "remarks"],
       optionalFields: [],
     },
-  ]
+]
+
+export default function VideoCallTemplatePage() {
+  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [isMounted, setIsMounted] = useState(false);
+
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    model: true,
+    client: false,
+    topics: false,
+  })
+  const [progress, setProgress] = useState(0)
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
+  const pdfRef = useRef<HTMLIFrameElement>(null)
+
+  const isAuthenticityCall = formData.purpose.toLowerCase().includes("authenticity")
+
 
   useEffect(() => {
     setIsMounted(true);
@@ -202,7 +203,7 @@ export default function VideoCallTemplatePage() {
       fieldsToCheck = fieldsToCheck.filter(f => !optionalFieldsToExclude.includes(f));
     }
     return fieldsToCheck;
-  }, [isAuthenticityCall, sections]);
+  }, [isAuthenticityCall]);
   
   const updateProgress = useCallback(() => {
     const fieldsToCheck = getFieldsToCheck();
@@ -225,15 +226,15 @@ export default function VideoCallTemplatePage() {
     }
   }, [formData, isMounted, updateProgress]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }))
-  }
+  }, []);
 
-  const setAuthenticityPurpose = () => {
+  const setAuthenticityPurpose = useCallback(() => {
     setFormData((prev) => ({
       ...prev,
       purpose: "Authenticity",
@@ -242,9 +243,9 @@ export default function VideoCallTemplatePage() {
         title: "Purpose Updated",
         description: "The purpose of the call has been set to 'Authenticity'.",
     })
-  }
+  }, [toast]);
 
-  const isSectionComplete = (sectionId: string) => {
+  const isSectionComplete = useCallback((sectionId: string) => {
     const section = sections.find((s) => s.id === sectionId)
     if (!section) return false
     
@@ -256,50 +257,21 @@ export default function VideoCallTemplatePage() {
     }
 
     return required.every((field) => formData[field]?.trim() !== "")
-  }
+  }, [formData, isAuthenticityCall]);
 
-  const isFormValid = () => {
+  const isFormValid = useCallback(() => {
     const fieldsToCheck = getFieldsToCheck();
     return fieldsToCheck.every((field) => formData[field as keyof FormData]?.trim() !== "")
-  }
+  }, [formData, getFieldsToCheck]);
 
-  const toggleSection = (sectionId: string) => {
+  const toggleSection = useCallback((sectionId: string) => {
     setExpandedSections((prev) => ({
       ...prev,
       [sectionId]: !prev[sectionId],
     }))
-  }
+  }, []);
 
-  const handleGeneratePdf = () => {
-    if (!isFormValid()) {
-      toast({
-        title: "Missing required fields",
-        description: "Please fill in all required fields before generating the PDF.",
-        variant: "destructive",
-      })
-
-      for (const section of sections) {
-        if (!isSectionComplete(section.id)) {
-          setExpandedSections((prev) => ({
-            ...prev,
-            [section.id]: true,
-          }))
-          break
-        }
-      }
-      return
-    }
-
-    setIsLoading(true)
-    setIsDialogOpen(true)
-
-    setTimeout(() => {
-      generatePDF()
-      setIsLoading(false)
-    }, 1000)
-  }
-
-  const generatePDF = () => {
+  const generatePDF = useCallback(() => {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const pageW = doc.internal.pageSize.width;
     const margin = 15;
@@ -408,9 +380,38 @@ export default function VideoCallTemplatePage() {
 
     const pdfDataUrl = doc.output("datauristring")
     setPdfUrl(pdfDataUrl)
-  }
+  }, [formData, isAuthenticityCall]);
 
-  const handleDownloadPdf = () => {
+  const handleGeneratePdf = useCallback(() => {
+    if (!isFormValid()) {
+      toast({
+        title: "Missing required fields",
+        description: "Please fill in all required fields before generating the PDF.",
+        variant: "destructive",
+      })
+
+      for (const section of sections) {
+        if (!isSectionComplete(section.id)) {
+          setExpandedSections((prev) => ({
+            ...prev,
+            [section.id]: true,
+          }))
+          break
+        }
+      }
+      return
+    }
+
+    setIsLoading(true)
+    setIsDialogOpen(true)
+
+    setTimeout(() => {
+      generatePDF()
+      setIsLoading(false)
+    }, 1000)
+  }, [isFormValid, isSectionComplete, generatePDF, toast]);
+
+  const handleDownloadPdf = useCallback(() => {
     if (!pdfUrl) return
     const link = document.createElement("a")
     link.href = pdfUrl
@@ -423,9 +424,9 @@ export default function VideoCallTemplatePage() {
       title: "PDF Downloaded",
       description: "Your video call information has been downloaded successfully.",
     })
-  }
+  }, [pdfUrl, formData.clientName, toast]);
 
-  const handleReset = async () => {
+  const handleReset = useCallback(async () => {
     if (confirm("Are you sure you want to reset the form? All data will be lost from the database.")) {
       setFormData(initialFormData)
       try {
@@ -438,9 +439,9 @@ export default function VideoCallTemplatePage() {
         toast({ title: "Error", description: "Failed to reset form data.", variant: "destructive"})
       }
     }
-  }
+  }, [toast]);
 
-  const renderFormField = (
+  const renderFormField = useCallback((
     name: keyof FormData,
     label: string,
     icon: React.ReactNode,
@@ -480,9 +481,9 @@ export default function VideoCallTemplatePage() {
         {helpText && <p className="text-xs text-muted-foreground">{helpText}</p>}
       </div>
     )
-  }
+  }, [formData, handleInputChange, isMounted, isAuthenticityCall]);
   
-  const renderTextareaField = (
+  const renderTextareaField = useCallback((
     name: keyof FormData,
     label: string,
     icon: React.ReactNode,
@@ -504,7 +505,7 @@ export default function VideoCallTemplatePage() {
             {helpText && <p className="text-xs text-muted-foreground">{helpText}</p>}
         </div>
     )
-  }
+  }, [formData, handleInputChange, isMounted]);
   
   if (!isMounted) {
     return null; // Or a loading spinner
