@@ -316,6 +316,7 @@ function ShopDetailsPage() {
 
             const clientsData = results.data as any[];
             const existingShopIds = new Set(allClients.map(c => c.shopId));
+            const validAgentNames = new Set(agents.map(a => a.name.toLowerCase()));
             
             const validatedData = clientsData.map(row => {
                 if (existingShopIds.has(row.shopId)) {
@@ -336,7 +337,13 @@ function ShopDetailsPage() {
                  if (!row.clientDetails || row.clientDetails.trim() === '') {
                     return { data: row, status: 'Invalid Data', reason: 'clientDetails cannot be blank.' };
                 }
-                return { data: { ...row, kycCompletedDate: kycDate }, status: 'Ready to Import' };
+                if (!row.agent || !validAgentNames.has(row.agent.toLowerCase())) {
+                    return { data: row, status: 'Invalid Data', reason: `Agent '${row.agent}' does not exist.` };
+                }
+                // Find the correct casing for the agent name
+                const originalAgentName = agents.find(a => a.name.toLowerCase() === row.agent.toLowerCase())?.name;
+
+                return { data: { ...row, kycCompletedDate: kycDate, agent: originalAgentName }, status: 'Ready to Import' };
             });
 
             setPreviewData(validatedData);
@@ -354,7 +361,7 @@ function ShopDetailsPage() {
     if(csvInputRef.current) {
         csvInputRef.current.value = "";
     }
-  }, [allClients, toast]);
+  }, [allClients, toast, agents]);
 
   const handleConfirmImport = useCallback(async () => {
     setIsImporting(true);
@@ -810,5 +817,3 @@ function ShopDetailsPage() {
 }
 
 export default withAuth(ShopDetailsPage, ['Agent', 'Admin', 'Superadmin']);
-
-    
