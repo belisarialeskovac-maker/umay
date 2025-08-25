@@ -150,7 +150,8 @@ export default function DepositTab() {
   const displayAgents = useMemo(() => agents.filter(agent => agent.role !== 'Superadmin'), [agents]);
   
   const filteredDeposits = useMemo(() => {
-    return deposits.filter(deposit => {
+    let sortedDeposits = [...deposits].sort((a,b) => b.date.getTime() - a.date.getTime());
+    return sortedDeposits.filter(deposit => {
         const lowercasedTerm = searchTerm.toLowerCase();
         const matchesSearch = searchTerm.trim() === '' ||
             deposit.shopId.toLowerCase().includes(lowercasedTerm) ||
@@ -179,7 +180,7 @@ export default function DepositTab() {
 
   useEffect(() => {
     setSelectedDeposits([]);
-  }, [currentPage, agentFilter, status, monthFilter, yearFilter, searchTerm]);
+  }, [currentPage, agentFilter, monthFilter, yearFilter, searchTerm]);
 
   const resetFilters = useCallback(() => {
     setSearchTerm("");
@@ -294,15 +295,16 @@ export default function DepositTab() {
     Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        transformHeader: header => header.trim().toLowerCase(),
+        transformHeader: header => header.trim(),
         complete: (results) => {
             const requiredHeaders = ["shopid", "agent", "date", "amount", "payment"];
-            const headers = results.meta.fields || [];
+            const fileHeaders = results.meta.fields || [];
 
-            if (!requiredHeaders.every(h => headers.includes(h))) {
+            const lowercasedFileHeaders = fileHeaders.map(h => h.toLowerCase());
+            if (!requiredHeaders.every(h => lowercasedFileHeaders.includes(h))) {
                 toast({
                     title: "Invalid CSV Format",
-                    description: `CSV must contain the headers: ${requiredHeaders.join(', ')}`,
+                    description: `CSV must contain headers: ${requiredHeaders.join(', ')}`,
                     variant: "destructive"
                 });
                 return;
@@ -311,40 +313,49 @@ export default function DepositTab() {
             const clientsMap = new Map(clients.map(c => [c.shopId.toLowerCase(), c]));
             
             const validatedData = results.data.map((row: any) => {
-                const shopId = row.shopid;
+                const getRowValue = (key: string) => {
+                    const actualHeader = fileHeaders.find(h => h.toLowerCase() === key.toLowerCase());
+                    return actualHeader ? row[actualHeader] : undefined;
+                };
+
+                const shopId = getRowValue('shopid');
                 const client = clientsMap.get(shopId?.toLowerCase());
                 
                 if (!client) {
-                    return { data: row, status: 'Invalid Data', reason: 'Shop ID not found.' };
-                }
-
-                const transactionDate = new Date(row.date);
-                if (!isValid(transactionDate)) {
-                    return { data: row, status: 'Invalid Data', reason: 'Invalid date format.' };
+                    return { data: row, status: 'Invalid Data' as const, reason: 'Shop ID not found.' };
                 }
                 
-                let paymentMode = row.payment;
+                const dateString = getRowValue('date');
+                const dateRegex = /(\w{3} \w{3} \d{2} \d{4} \d{2}:\d{2}:\d{2})/;
+                const dateMatch = dateString?.match(dateRegex);
+                const transactionDate = dateMatch ? new Date(dateMatch[0]) : new Date(dateString);
+                
+                if (!isValid(transactionDate)) {
+                    return { data: row, status: 'Invalid Data' as const, reason: 'Invalid date format.' };
+                }
+                
+                let paymentMode = getRowValue('payment');
                 if (['ewallet', 'online banking'].includes(paymentMode.toLowerCase())) {
                     paymentMode = 'Ewallet/Online Banking';
                 } else if (paymentMode.toLowerCase() !== 'crypto') {
-                    return { data: row, status: 'Invalid Data', reason: 'Invalid payment mode.' };
+                    return { data: row, status: 'Invalid Data' as const, reason: 'Invalid payment mode. Use Ewallet, Online Banking, or Crypto.' };
                 }
                 
-                const amount = parseFloat(row.amount);
+                const amount = parseFloat(getRowValue('amount'));
                 if (isNaN(amount) || amount <= 0) {
-                     return { data: row, status: 'Invalid Data', reason: 'Amount must be a positive number.' };
+                     return { data: row, status: 'Invalid Data' as const, reason: 'Amount must be a positive number.' };
                 }
 
                 const finalData = {
                     shopId: client.shopId,
                     clientName: client.clientName,
-                    agent: row.agent,
+                    agent: getRowValue('agent'),
                     date: transactionDate,
                     amount: amount,
                     paymentMode: paymentMode
                 };
 
-                return { data: finalData, status: 'Ready to Import' };
+                return { data: finalData, status: 'Ready to Import' as const };
             });
 
             setPreviewData(validatedData);
@@ -359,6 +370,7 @@ export default function DepositTab() {
         csvInputRef.current.value = "";
     }
   }, [clients, toast]);
+
 
   const handleConfirmImport = useCallback(async () => {
     setIsImporting(true);
@@ -432,6 +444,9 @@ export default function DepositTab() {
   const clientFoundEdit = !!watchedEditShopId && clients.some(c => c.shopId === watchedEditShopId);
   const canManage = user?.role === 'Admin' || user?.role === 'Superadmin';
   const readyToImportCount = useMemo(() => previewData.filter(row => row.status === 'Ready to Import').length, [previewData]);
+  const hasInvalidRows = useMemo(() => previewData.some(row => row.status === 'Invalid Data'), [previewData]);
+
+  const isAllOnPageSelected = paginatedDeposits.length > 0 && selectedDeposits.length === paginatedDeposits.length;
 
 
   if (dataLoading) {
@@ -627,9 +642,19 @@ export default function DepositTab() {
       </div>
 
        {canManage && selectedDeposits.length > 0 && (
-        <div className="flex items-center gap-4 mb-4 p-3 bg-muted rounded-lg">
-            <p className="text-sm font-medium">{selectedDeposits.length} deposit(s) selected.</p>
-            <Button size="sm" variant="destructive" onClick={() => setBulkDeleteAlertOpen(true)}>Delete Selected</Button>
+        <div className="flex items-center gap-4 mb-4 p-3 bg-muted rounded-lg text-sm">
+             {selectedDeposits.length === filteredDeposits.length ? (
+                <>
+                <p className="font-medium">All {selectedDeposits.length} deposit(s) selected.</p>
+                <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setSelectedDeposits([])}>Clear selection</Button>
+                </>
+             ) : (
+                <>
+                <p className="font-medium">{selectedDeposits.length} deposit(s) on this page selected.</p>
+                <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setSelectedDeposits(filteredDeposits.map(d => d.id))}>Select all {filteredDeposits.length} deposits</Button>
+                </>
+             )}
+            <Button size="sm" variant="destructive" className="ml-auto" onClick={() => setBulkDeleteAlertOpen(true)}>Delete Selected</Button>
         </div>
       )}
 
@@ -639,7 +664,7 @@ export default function DepositTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                {canManage && <TableHead><Checkbox onCheckedChange={(checked) => handleSelectAll(Boolean(checked))} checked={selectedDeposits.length === paginatedDeposits.length && paginatedDeposits.length > 0} /></TableHead>}
+                {canManage && <TableHead><Checkbox onCheckedChange={(checked) => handleSelectAll(Boolean(checked))} checked={isAllOnPageSelected} aria-label="Select all rows on this page" /></TableHead>}
                 <TableHead>Shop ID</TableHead>
                 <TableHead>Client Name</TableHead>
                 <TableHead>Agent</TableHead>
@@ -652,7 +677,7 @@ export default function DepositTab() {
             <TableBody>
               {paginatedDeposits.map((deposit) => (
                 <TableRow key={deposit.id} data-state={selectedDeposits.includes(deposit.id) && "selected"}>
-                   {canManage && <TableCell><Checkbox onCheckedChange={(checked) => handleSelectDeposit(deposit.id, Boolean(checked))} checked={selectedDeposits.includes(deposit.id)} /></TableCell>}
+                   {canManage && <TableCell><Checkbox onCheckedChange={(checked) => handleSelectDeposit(deposit.id, Boolean(checked))} checked={selectedDeposits.includes(deposit.id)} aria-label={`Select row for ${deposit.clientName}`} /></TableCell>}
                   <TableCell>{deposit.shopId}</TableCell>
                   <TableCell>{deposit.clientName}</TableCell>
                   <TableCell>{deposit.agent}</TableCell>
@@ -809,7 +834,7 @@ export default function DepositTab() {
                             <TableHead>Date</TableHead>
                             <TableHead>Amount</TableHead>
                             <TableHead>Payment</TableHead>
-                            <TableHead>Reason</TableHead>
+                            {hasInvalidRows && <TableHead>Reason</TableHead>}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -826,7 +851,7 @@ export default function DepositTab() {
                                 <TableCell>{row.data.date ? format(new Date(row.data.date), "PPP") : 'Invalid'}</TableCell>
                                 <TableCell>${Number(row.data.amount || 0).toFixed(2)}</TableCell>
                                 <TableCell>{row.data.paymentMode || row.data.payment}</TableCell>
-                                <TableCell>{row.reason || 'N/A'}</TableCell>
+                                {hasInvalidRows && <TableCell>{row.reason || 'N/A'}</TableCell>}
                             </TableRow>
                         ))}
                     </TableBody>
