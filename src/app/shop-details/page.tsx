@@ -321,12 +321,21 @@ function ShopDetailsPage() {
                 if (existingShopIds.has(row.shopId)) {
                     return { data: row, status: 'Duplicate ID', reason: 'Shop ID already exists.' };
                 }
-                const kycDate = parseISO(row.kycCompletedDate);
+                
+                // Try parsing different date formats
+                let kycDate = new Date(row.kycCompletedDate);
+                if (!isValid(kycDate)) {
+                  kycDate = parseISO(row.kycCompletedDate);
+                }
+
                 if (!isValid(kycDate)) {
                     return { data: row, status: 'Invalid Data', reason: 'Invalid date format for kycCompletedDate.' };
                 }
                 if (!clientStatus.includes(row.status)) {
                     return { data: row, status: 'Invalid Data', reason: `Status must be one of: ${clientStatus.join(', ')}` };
+                }
+                if (!row.clientDetails || row.clientDetails.trim() === '') {
+                    return { data: row, status: 'Invalid Data', reason: 'clientDetails cannot be blank.' };
                 }
                 return { data: { ...row, kycCompletedDate: kycDate }, status: 'Ready to Import' };
             });
