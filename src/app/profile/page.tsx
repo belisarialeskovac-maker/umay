@@ -174,7 +174,7 @@ function ProfilePage() {
         <div className="lg:col-span-1 flex flex-col gap-6">
             <Card>
                 <CardHeader className="flex flex-col items-center text-center">
-                    <Avatar className="w-24 h-24 mb-4">
+                    <Avatar className="w-24 h-24 mb-4 border-2 border-primary/20">
                         <AvatarImage src={`https://placehold.co/100x100.png`} data-ai-hint="person" />
                         <AvatarFallback>{userInitials}</AvatarFallback>
                     </Avatar>
@@ -183,8 +183,8 @@ function ProfilePage() {
                 </CardHeader>
                 <CardContent>
                     <div className="text-sm text-muted-foreground space-y-2">
-                        <div className="flex justify-between"><span className="font-semibold text-foreground">Role:</span> <Badge variant="secondary">{user.role}</Badge></div>
-                        <div className="flex justify-between"><span className="font-semibold text-foreground">Type:</span> <Badge variant="secondary">{user.agentType}</Badge></div>
+                        <div className="flex justify-between"><span className="font-semibold text-foreground">Role:</span> <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 border-blue-500/20">{user.role}</Badge></div>
+                        <div className="flex justify-between"><span className="font-semibold text-foreground">Type:</span> <Badge variant="secondary" className="bg-purple-500/10 text-purple-500 border-purple-500/20">{user.agentType}</Badge></div>
                         <div className="flex justify-between"><span className="font-semibold text-foreground">Hired:</span> <span>{format(user.dateHired, "PPP")}</span></div>
                         <div className="flex justify-between"><span className="font-semibold text-foreground">Status:</span> <Badge variant={user.status === 'Active' ? 'default' : 'destructive'}>{user.status}</Badge></div>
                     </div>
@@ -310,7 +310,7 @@ function ProfilePage() {
                 <CardContent className="p-4">
                     <Tabs defaultValue="overview">
                         <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 lg:grid-cols-7">
-                            <TabsTrigger value="overview"><Users className="mr-2 h-4 w-4" />Overview</TabsTrigger>
+                            <TabsTrigger value="overview"><User className="mr-2 h-4 w-4" />Overview</TabsTrigger>
                             <TabsTrigger value="clients"><Users className="mr-2 h-4 w-4" />Clients</TabsTrigger>
                             <TabsTrigger value="transactions"><Activity className="mr-2 h-4 w-4" />Transactions</TabsTrigger>
                             <TabsTrigger value="inventory"><Boxes className="mr-2 h-4 w-4" />Inventory</TabsTrigger>
@@ -319,22 +319,50 @@ function ProfilePage() {
                             <TabsTrigger value="rewards"><Award className="mr-2 h-4 w-4" />Rewards</TabsTrigger>
                         </TabsList>
                         <TabsContent value="overview" className="pt-6">
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                                <Card>
-                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">My Clients</CardTitle><Users className="h-4 w-4 text-muted-foreground"/></CardHeader>
-                                    <CardContent><div className="text-2xl font-bold">{agentClients.length}</div></CardContent>
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+                                <Card className="hover:bg-muted/50 transition-colors">
+                                    <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+                                        <div className="p-3 rounded-full bg-blue-500/10 text-blue-500">
+                                            <Users className="h-6 w-6"/>
+                                        </div>
+                                        <div>
+                                            <CardDescription>My Clients</CardDescription>
+                                            <CardTitle className="text-3xl font-bold">{agentClients.length}</CardTitle>
+                                        </div>
+                                    </CardHeader>
                                 </Card>
-                                <Card>
-                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">My Deposits</CardTitle><Banknote className="h-4 w-4 text-muted-foreground"/></CardHeader>
-                                    <CardContent><div className="text-2xl font-bold">${agentDeposits.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}</div></CardContent>
+                                <Card className="hover:bg-muted/50 transition-colors">
+                                    <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+                                        <div className="p-3 rounded-full bg-green-500/10 text-green-500">
+                                            <Banknote className="h-6 w-6"/>
+                                        </div>
+                                        <div>
+                                            <CardDescription>My Deposits</CardDescription>
+                                            <CardTitle className="text-3xl font-bold">${agentDeposits.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}</CardTitle>
+                                        </div>
+                                    </CardHeader>
                                 </Card>
-                                <Card>
-                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">My Withdrawals</CardTitle><Banknote className="h-4 w-4 text-muted-foreground"/></CardHeader>
-                                    <CardContent><div className="text-2xl font-bold">${agentWithdrawals.reduce((sum, w) => sum + w.amount, 0).toFixed(2)}</div></CardContent>
+                                <Card className="hover:bg-muted/50 transition-colors">
+                                    <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+                                        <div className="p-3 rounded-full bg-red-500/10 text-red-500">
+                                             <Banknote className="h-6 w-6"/>
+                                        </div>
+                                        <div>
+                                            <CardDescription>My Withdrawals</CardDescription>
+                                            <CardTitle className="text-3xl font-bold">${agentWithdrawals.reduce((sum, w) => sum + w.amount, 0).toFixed(2)}</CardTitle>
+                                        </div>
+                                    </CardHeader>
                                 </Card>
-                                <Card>
-                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">My Devices</CardTitle><Boxes className="h-4 w-4 text-muted-foreground"/></CardHeader>
-                                    <CardContent><div className="text-2xl font-bold">{agentInventory.length}</div></CardContent>
+                                <Card className="hover:bg-muted/50 transition-colors">
+                                    <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+                                         <div className="p-3 rounded-full bg-gray-500/10 text-gray-500">
+                                            <Boxes className="h-6 w-6"/>
+                                        </div>
+                                        <div>
+                                            <CardDescription>My Devices</CardDescription>
+                                            <CardTitle className="text-3xl font-bold">{agentInventory.length}</CardTitle>
+                                        </div>
+                                    </CardHeader>
                                 </Card>
                             </div>
                         </TabsContent>
