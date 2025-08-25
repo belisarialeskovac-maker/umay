@@ -5,9 +5,10 @@ import { useState, useEffect } from 'react';
 
 type LoadingScreenProps = {
     onAnimationComplete: () => void;
+    userName?: string | null;
 };
 
-export default function LoadingScreen({ onAnimationComplete }: LoadingScreenProps) {
+export default function LoadingScreen({ onAnimationComplete, userName }: LoadingScreenProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [currentLetterIndex, setCurrentLetterIndex] = useState(-1);
   const [fadeOut, setFadeOut] = useState(false);
@@ -127,7 +128,7 @@ export default function LoadingScreen({ onAnimationComplete }: LoadingScreenProp
               />
             </div>
             <p className="text-gray-400 text-sm mt-3 tracking-wide">
-              Loading your experience...
+              {userName ? `Welcome back, ${userName}` : "Loading your experience..."}
             </p>
           </div>
         </div>

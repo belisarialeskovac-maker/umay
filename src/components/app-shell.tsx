@@ -67,7 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   
   if (isInitialLogin) {
-    return <LoadingScreen onAnimationComplete={completeInitialLogin} />;
+    return <LoadingScreen userName={user?.name} onAnimationComplete={completeInitialLogin} />;
   }
   
   if (authLoading && !user) {
