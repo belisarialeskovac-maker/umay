@@ -55,7 +55,7 @@ const settingsNav = { href: '#', icon: Settings, label: 'Settings' };
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout, loading: authLoading, isInitialLogin, completeInitialLogin } = useAuth();
-  const { agents, orders, loading: dataLoading } = useData();
+  const { agents, orders } = useData();
   
   const pendingAgentsCount = agents.filter(agent => agent.status === 'Pending').length;
   const pendingOrdersCount = orders.filter(order => order.status === 'Pending').length;
@@ -78,14 +78,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <main className="flex-1">{children}</main>;
-  }
-  
-  if (dataLoading) {
-     return (
-          <div className="flex h-screen w-full items-center justify-center">
-              <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
-          </div>
-      )
   }
 
   const userInitials = user.name?.split(' ').map(n => n[0]).join('') || 'U';
