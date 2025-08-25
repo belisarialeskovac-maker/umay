@@ -2,13 +2,15 @@
 "use client"
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 
-export default function LoadingScreen() {
+type LoadingScreenProps = {
+    onAnimationComplete: () => void;
+};
+
+export default function LoadingScreen({ onAnimationComplete }: LoadingScreenProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [currentLetterIndex, setCurrentLetterIndex] = useState(-1);
   const [fadeOut, setFadeOut] = useState(false);
-  const router = useRouter();
 
   const fullText = 'TEAM HOTEL';
 
@@ -25,16 +27,16 @@ export default function LoadingScreen() {
         // Start fade out after a brief pause
         setTimeout(() => {
           setFadeOut(true);
-          // Redirect after fade completes
+          // Notify parent component that animation is complete
           setTimeout(() => {
-            router.push('/');
+            onAnimationComplete();
           }, 800);
         }, 500);
       }
     }, 2500 / fullText.length);
 
     return () => clearInterval(typingInterval);
-  }, [router]);
+  }, [onAnimationComplete]);
 
   return (
     <div className={`fixed inset-0 overflow-hidden transition-all duration-800 ${fadeOut ? 'opacity-0 scale-110' : 'opacity-100 scale-100'}`}>

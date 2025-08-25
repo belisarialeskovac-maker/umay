@@ -37,6 +37,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/auth-context';
 import { useData } from '@/context/data-context';
+import LoadingScreen from './loading-screen';
 
 const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['Agent', 'Admin', 'Superadmin'] },
@@ -53,7 +54,7 @@ const settingsNav = { href: '#', icon: Settings, label: 'Settings' };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, logout, loading: authLoading } = useAuth();
+  const { user, logout, loading: authLoading, isInitialLogin, completeInitialLogin } = useAuth();
   const { agents, orders, loading: dataLoading } = useData();
   
   const pendingAgentsCount = agents.filter(agent => agent.status === 'Pending').length;
@@ -65,7 +66,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   
-  if (authLoading || dataLoading) {
+  if (isInitialLogin) {
+    return <LoadingScreen onAnimationComplete={completeInitialLogin} />;
+  }
+  
+  if (authLoading || dataLoading && user) {
       return (
           <div className="flex h-screen w-full items-center justify-center">
               <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
