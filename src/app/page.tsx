@@ -39,8 +39,8 @@ function Home() {
   const [topShops, setTopShops] = useState<LeaderboardEntry[]>([]);
   const [topClientsAdded, setTopClientsAdded] = useState<LeaderboardEntry[]>([]);
 
-  const [selectedMonth, setSelectedMonth] = useState<number>(getMonth(new Date()));
-  const [selectedYear, setSelectedYear] = useState<number>(getYear(new Date()));
+  const [selectedMonth, setSelectedMonth] = useState<string | number>(getMonth(new Date()));
+  const [selectedYear, setSelectedYear] = useState<string | number>(getYear(new Date()));
   
   const availableYears = useMemo(() => [getYear(new Date()), getYear(new Date()) - 1, getYear(new Date()) - 2], []);
   
@@ -50,44 +50,59 @@ function Home() {
   })), []);
 
   const calculateStats = useCallback(() => {
-    const startDate = startOfMonth(new Date(selectedYear, selectedMonth));
-    const endDate = endOfMonth(new Date(selectedYear, selectedMonth));
-    const interval = { start: startDate, end: endDate };
+    const isAllTime = selectedYear === 'all';
+
+    const getInterval = () => {
+        if (isAllTime || selectedMonth === 'all') {
+            return { start: new Date(0), end: new Date() };
+        }
+        const year = typeof selectedYear === 'number' ? selectedYear : getYear(new Date());
+        const month = typeof selectedMonth === 'number' ? selectedMonth : getMonth(new Date());
+        const startDate = startOfMonth(new Date(year, month));
+        const endDate = endOfMonth(new Date(year, month));
+        return { start: startDate, end: endDate };
+    };
+
+    const interval = getInterval();
+
+    const filterByInterval = (items: any[], dateField: string) => {
+        if (isAllTime) return items;
+        if (selectedMonth === 'all' && typeof selectedYear === 'number') {
+            return items.filter(item => getYear(item[dateField]) === selectedYear);
+        }
+        return items.filter(item => isWithinInterval(item[dateField], interval));
+    };
 
     // Dashboard Stats
-    const filteredClients = allClients.filter(c => isWithinInterval(c.kycCompletedDate, interval)).length;
-    const filteredDeposits = allDeposits
-      .filter(d => isWithinInterval(d.date, interval))
-      .reduce((sum, d) => sum + d.amount, 0);
-    const filteredWithdrawals = allWithdrawals
-      .filter(w => isWithinInterval(w.date, interval))
-      .reduce((sum, w) => sum + w.amount, 0);
-      
+    const filteredClients = filterByInterval(allClients, 'kycCompletedDate');
+    const filteredDeposits = filterByInterval(allDeposits, 'date');
+    const filteredWithdrawals = filterByInterval(allWithdrawals, 'date');
+    
     setStats({
-      clients: filteredClients,
-      deposits: filteredDeposits,
-      withdrawals: filteredWithdrawals,
+      clients: filteredClients.length,
+      deposits: filteredDeposits.reduce((sum, d) => sum + d.amount, 0),
+      withdrawals: filteredWithdrawals.reduce((sum, w) => sum + w.amount, 0),
     });
 
     const displayAgents = agents.filter(agent => agent.role !== 'Superadmin');
     
     // Leaderboards
     const depositsByAgent = displayAgents.map(agent => {
-        const total = allDeposits
-            .filter(d => d.agent === agent.name && isWithinInterval(d.date, interval))
+        const total = filterByInterval(allDeposits, 'date')
+            .filter(d => d.agent === agent.name)
             .reduce((sum, d) => sum + d.amount, 0);
         return { agentName: agent.name, value: total };
     }).sort((a,b) => b.value - a.value).slice(0,10);
     setTopDeposits(depositsByAgent);
 
     const shopsByAgent = displayAgents.map(agent => {
-        const count = allClients.filter(c => c.agent === agent.name && isWithinInterval(c.kycCompletedDate, interval)).length;
+        const count = filterByInterval(allClients, 'kycCompletedDate').filter(c => c.agent === agent.name).length;
         return { agentName: agent.name, value: count };
     }).sort((a,b) => b.value - a.value).slice(0,10);
     setTopShops(shopsByAgent);
     
     const clientsAddedByAgent = displayAgents.map(agent => {
-        const count = allDailyAddedClients.filter(c => c.assignedAgent === agent.name && isWithinInterval(c.date, interval)).length;
+        const count = filterByInterval(allDailyAddedClients, 'date').filter(c => c.assignedAgent === agent.name).length;
         return { agentName: agent.name, value: count };
     }).sort((a,b) => b.value - a.value).slice(0,10);
     setTopClientsAdded(clientsAddedByAgent);
@@ -99,6 +114,30 @@ function Home() {
       calculateStats();
     }
   }, [dataLoading, calculateStats]);
+
+  const handleYearChange = (value: string) => {
+    const yearValue = value === 'all' ? 'all' : Number(value);
+    setSelectedYear(yearValue);
+    if (yearValue === 'all') {
+        setSelectedMonth('all');
+    }
+  };
+
+  const handleMonthChange = (value: string) => {
+    setSelectedMonth(value === 'all' ? 'all' : Number(value));
+  };
+  
+  const getFilterLabel = () => {
+    if (selectedYear === 'all') return 'All time';
+    
+    const yearLabel = selectedYear;
+    const monthLabel = selectedMonth === 'all' 
+        ? 'the entire year' 
+        : months.find(m => m.value === selectedMonth)?.label;
+        
+    return `${monthLabel} ${yearLabel}`;
+  }
+
 
   if (dataLoading) {
     return (
@@ -153,24 +192,26 @@ function Home() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div className="mb-4 sm:mb-0">
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">An overview of your workspace for {months[selectedMonth].label} {selectedYear}.</p>
+          <p className="text-muted-foreground mt-1">An overview of your workspace for {getFilterLabel()}.</p>
         </div>
         <div className="flex gap-2">
-          <Select value={String(selectedMonth)} onValueChange={(value) => setSelectedMonth(Number(value))}>
+          <Select value={String(selectedMonth)} onValueChange={handleMonthChange} disabled={selectedYear === 'all'}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select month" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">All Months</SelectItem>
               {months.map(month => (
                 <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
+          <Select value={String(selectedYear)} onValueChange={handleYearChange}>
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Select year" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">All time</SelectItem>
               {availableYears.map(year => (
                 <SelectItem key={year} value={String(year)}>{year}</SelectItem>
               ))}
@@ -187,7 +228,7 @@ function Home() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.clients}</div>
-            <p className="text-xs text-muted-foreground">New shops this month</p>
+            <p className="text-xs text-muted-foreground">New shops for selected period</p>
           </CardContent>
         </Card>
         <Card>
@@ -197,7 +238,7 @@ function Home() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${stats.deposits.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Total deposits this month</p>
+            <p className="text-xs text-muted-foreground">Total deposits for selected period</p>
           </CardContent>
         </Card>
         <Card>
@@ -207,7 +248,7 @@ function Home() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${stats.withdrawals.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Total withdrawals this month</p>
+            <p className="text-xs text-muted-foreground">Total withdrawals for selected period</p>
           </CardContent>
         </Card>
       </div>
