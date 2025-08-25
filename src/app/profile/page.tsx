@@ -157,6 +157,8 @@ function ProfilePage() {
         </div>
     )
   }
+  
+  const canManage = user.role === 'Admin' || user.role === 'Superadmin';
 
   return (
     <div className="w-full h-full">
@@ -183,7 +185,7 @@ function ProfilePage() {
                     <Video className="mr-2 h-4 w-4" /> Videocall Template
                 </Link>
             </Button>
-            {user.role === 'Agent' && (
+            {canManage && (
               <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
                   <DialogTrigger asChild>
                       <Button><ClipboardList className="mr-2 h-4 w-4" /> Request an Order</Button>

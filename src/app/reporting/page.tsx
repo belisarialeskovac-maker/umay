@@ -3,9 +3,10 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { format, isToday, isThisMonth, startOfToday } from "date-fns"
-import { Loader2, Plus, Trash2, ChevronUp, ChevronDown, FileText, RefreshCw, Languages, Copy, Download, Upload, Calendar, BarChart, Banknote } from "lucide-react"
+import { Loader2, Plus, Trash2, ChevronUp, ChevronDown, FileText, RefreshCw, Languages, Copy, Download, Upload, Calendar, BarChart, Banknote, User as UserIcon } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { doc, setDoc, getDoc, onSnapshot, Timestamp } from "firebase/firestore"
+import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -285,6 +286,8 @@ function ReportingPage() {
     )
   }
 
+  const isAgent = user?.role === 'Agent';
+
   return (
     <div className="w-full h-full space-y-6">
       <div className="flex justify-between items-center">
@@ -294,6 +297,13 @@ function ReportingPage() {
             Generate your daily performance report.
           </p>
         </div>
+         {isAgent && (
+            <Button asChild variant="outline">
+                <Link href="/profile">
+                    <UserIcon className="mr-2 h-4 w-4" /> Back to Profile
+                </Link>
+            </Button>
+        )}
       </div>
 
        <Card>

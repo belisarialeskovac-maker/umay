@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { db } from "@/lib/firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import Link from "next/link"
 
 import {
   Dialog,
@@ -55,6 +56,8 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/context/auth-context"
+
 
 interface FormData {
   // Model Details
@@ -164,6 +167,7 @@ const sections = [
 ]
 
 export default function VideoCallTemplatePage() {
+  const { user } = useAuth()
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -511,6 +515,8 @@ export default function VideoCallTemplatePage() {
     return null; // Or a loading spinner
   }
 
+  const isAgent = user?.role === 'Agent';
+
   return (
     <div className="w-full h-full">
         <div className="flex justify-between items-center mb-6">
@@ -520,6 +526,13 @@ export default function VideoCallTemplatePage() {
                 Fill the form and generate a PDF for the video call.
             </p>
             </div>
+            {isAgent && (
+                <Button asChild variant="outline">
+                    <Link href="/profile">
+                        <UserIcon className="mr-2 h-4 w-4" /> Back to Profile
+                    </Link>
+                </Button>
+            )}
         </div>
 
         <Card>

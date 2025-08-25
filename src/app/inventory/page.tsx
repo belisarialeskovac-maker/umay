@@ -2,12 +2,14 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
+import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2 } from "lucide-react"
+import { Loader2, User as UserIcon } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, updateDoc, deleteDoc, query, where, doc, serverTimestamp, getDocs } from "firebase/firestore"
+import { Button } from "@/components/ui/button"
 
 import InventoryTable from "./components/inventory-table"
 import AddDeviceForm from "./components/add-device-form"
@@ -30,8 +32,8 @@ function InventoryPage() {
   const { toast } = useToast()
 
   const userVisibleDevices = useMemo(() => {
-    if (dataLoading) return [];
-    if (user?.role === 'Agent') {
+    if (dataLoading || !user) return [];
+    if (user.role === 'Agent') {
       return allDevices.filter(d => d.agent === user.name);
     }
     return allDevices;
@@ -182,9 +184,18 @@ function InventoryPage() {
 
   return (
     <div className="w-full h-full">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Device Inventory Management</h1>
-        <p className="text-muted-foreground">Track and manage all your devices in one place</p>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Device Inventory Management</h1>
+          <p className="text-muted-foreground">Track and manage all your devices in one place</p>
+        </div>
+        {isAgent && (
+            <Button asChild variant="outline">
+                <Link href="/profile">
+                    <UserIcon className="mr-2 h-4 w-4" /> Back to Profile
+                </Link>
+            </Button>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
