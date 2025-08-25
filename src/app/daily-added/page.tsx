@@ -84,6 +84,7 @@ const formSchema = z.object({
   age: z.coerce.number().min(18, "Client must be at least 18."),
   location: z.string().min(2, "Location is required."),
   work: z.string().min(2, "Work is required."),
+  assignedAgent: z.string().optional(),
 });
 
 function DailyAddedPage() {
@@ -410,6 +411,30 @@ function DailyAddedPage() {
             <FormField control={editForm.control} name="age" render={({ field }) => (<FormItem><FormLabel>Age</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)} />
             <FormField control={editForm.control} name="location" render={({ field }) => (<FormItem><FormLabel>Location</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
             <FormField control={editForm.control} name="work" render={({ field }) => (<FormItem><FormLabel>Work</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+            {canManage && (
+              <FormField
+                control={editForm.control}
+                name="assignedAgent"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assigned Agent</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an agent" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {displayAgents.map(agent => (
+                          <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
         <DialogFooter><Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button><Button type="submit">Save Changes</Button></DialogFooter></form></Form></DialogContent></Dialog>
         <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the client record for {clientToDelete?.name}.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteClient}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
         <AlertDialog open={bulkDeleteAlertOpen} onOpenChange={setBulkDeleteAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the selected {selectedClients.length} client records.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleBulkDelete}>Delete All</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
