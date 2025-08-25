@@ -30,8 +30,8 @@ const formSchema = z.object({
   imei: z.string().min(15, "IMEI must be at least 15 characters.").max(17, "IMEI must be at most 17 characters."),
   model: z.string().min(1, "Model is required."),
   color: z.string().min(1, "Color is required."),
-  appleIdUsername: z.string().optional(),
-  appleIdPassword: z.string().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
   remarks: z.string().optional(),
 })
 
@@ -49,14 +49,23 @@ export default function AddDeviceForm({ onSubmit, agentNames }: AddDeviceFormPro
       imei: "",
       model: "",
       color: "",
-      appleIdUsername: "",
-      appleIdPassword: "",
+      username: "",
+      password: "",
       remarks: "",
     },
   })
 
   async function handleFormSubmit(values: z.infer<typeof formSchema>) {
-    const success = await onSubmit(values)
+    const deviceData = {
+        imei: values.imei,
+        model: values.model,
+        color: values.color,
+        appleIdUsername: values.username,
+        appleIdPassword: values.password,
+        remarks: values.remarks,
+        agent: values.agent,
+    }
+    const success = await onSubmit(deviceData)
     if (success) {
       form.reset()
     }
@@ -138,10 +147,10 @@ export default function AddDeviceForm({ onSubmit, agentNames }: AddDeviceFormPro
           />
           <FormField
             control={form.control}
-            name="appleIdUsername"
+            name="username"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Apple ID Username (Optional)</FormLabel>
+                <FormLabel>Username (Optional)</FormLabel>
                 <FormControl>
                   <Input placeholder="Enter Apple ID" {...field} />
                 </FormControl>
@@ -151,10 +160,10 @@ export default function AddDeviceForm({ onSubmit, agentNames }: AddDeviceFormPro
           />
           <FormField
             control={form.control}
-            name="appleIdPassword"
+            name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Apple ID Password (Optional)</FormLabel>
+                <FormLabel>Password (Optional)</FormLabel>
                 <FormControl>
                   <Input type="password" placeholder="Enter Apple ID Password" {...field} />
                 </FormControl>

@@ -68,8 +68,8 @@ const editFormSchema = z.object({
   imei: z.string().min(15, "IMEI must be 15 characters.").max(17, "IMEI must be 17 characters."),
   model: z.string().min(1, "Model is required."),
   color: z.string().min(1, "Color is required."),
-  appleIdUsername: z.string().optional(),
-  appleIdPassword: z.string().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
   remarks: z.string().optional(),
 })
 
@@ -99,15 +99,20 @@ function InventoryTable({
       imei: device.imei,
       model: device.model,
       color: device.color,
-      appleIdUsername: device.appleIdUsername || "",
-      appleIdPassword: device.appleIdPassword || "",
+      username: device.appleIdUsername || "",
+      password: device.appleIdPassword || "",
       remarks: device.remarks || "",
     })
   }, [form]);
 
   const handleUpdateSubmit = useCallback(async (values: z.infer<typeof editFormSchema>) => {
     if (!editingDevice) return
-    const success = await onUpdate(editingDevice.id, values)
+    const updateData = {
+        ...values,
+        appleIdUsername: values.username,
+        appleIdPassword: values.password
+    };
+    const success = await onUpdate(editingDevice.id, updateData)
     if (success) {
       setEditingDevice(null)
     }
@@ -147,8 +152,8 @@ function InventoryTable({
               <TableHead>IMEI</TableHead>
               <TableHead>Model</TableHead>
               <TableHead>Color</TableHead>
-              <TableHead>Apple ID</TableHead>
-              <TableHead>Apple ID Password</TableHead>
+              <TableHead>Username</TableHead>
+              <TableHead>Password</TableHead>
               <TableHead>Remarks</TableHead>
               <TableHead>Last Updated</TableHead>
               <TableHead>
@@ -291,10 +296,10 @@ function InventoryTable({
                   />
                   <FormField
                       control={form.control}
-                      name="appleIdUsername"
+                      name="username"
                       render={({ field }) => (
                       <FormItem>
-                          <FormLabel>Apple ID Username</FormLabel>
+                          <FormLabel>Username</FormLabel>
                           <FormControl>
                           <Input {...field} />
                           </FormControl>
@@ -304,10 +309,10 @@ function InventoryTable({
                   />
                   <FormField
                       control={form.control}
-                      name="appleIdPassword"
+                      name="password"
                       render={({ field }) => (
                       <FormItem>
-                          <FormLabel>Apple ID Password</FormLabel>
+                          <FormLabel>Password</FormLabel>
                           <FormControl>
                           <Input type="password" {...field} />
                           </FormControl>

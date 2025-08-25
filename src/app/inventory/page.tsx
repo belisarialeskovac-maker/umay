@@ -232,7 +232,7 @@ function InventoryPage() {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
-            const requiredHeaders = ["agent", "imei", "model", "color", "appleIdUsername", "appleIdPassword", "remarks"];
+            const requiredHeaders = ["agent", "imei", "model", "color", "username", "password", "remarks"];
             if (!requiredHeaders.every(h => results.meta.fields?.map(f => f.toLowerCase()).includes(h))) {
                 toast({
                     title: "Invalid CSV Format",
@@ -266,8 +266,8 @@ function InventoryPage() {
                     imei: row.imei,
                     model: row.model,
                     color: row.color,
-                    appleIdUsername: row.appleIdUsername || "",
-                    appleIdPassword: row.appleIdPassword || "",
+                    appleIdUsername: row.username || "",
+                    appleIdPassword: row.password || "",
                     remarks: row.remarks || "",
                 };
                 
