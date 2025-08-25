@@ -155,7 +155,7 @@ function DailyAddedPage() {
         const matchesYear = yearFilter === 'all' || getYear(clientDate) === parseInt(yearFilter);
 
         return matchesSearch && matchesAgent && matchesMonth && matchesYear;
-    });
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [userVisibleClients, searchTerm, agentFilter, monthFilter, yearFilter]);
 
 
