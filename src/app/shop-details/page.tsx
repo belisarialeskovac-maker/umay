@@ -356,10 +356,11 @@ function ShopDetailsPage() {
                      return { data: row, status: 'Invalid Data', reason: `Status must be one of: ${clientStatus.join(', ')}` };
                 }
 
+                const clientName = getRowValue('clientName') || getRowValue('clientNam');
 
                 const finalData = {
                     shopId: shopId,
-                    clientName: getRowValue('clientName'),
+                    clientName: clientName,
                     agent: getRowValue('agent'),
                     kycCompletedDate: kycDate,
                     status: statusValue,
@@ -644,7 +645,7 @@ function ShopDetailsPage() {
                             <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => openEditDialog(client)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                                {(user?.role === 'Agent' || canManage) && <DropdownMenuItem onClick={() => openEditDialog(client)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>}
                                 {canManage && (
                                     <>
                                         <DropdownMenuSeparator />
@@ -691,43 +692,37 @@ function ShopDetailsPage() {
             <Form {...editForm}>
                 <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
                     <FormField control={editForm.control} name="shopId" render={({ field }) => (
-                        <FormItem><FormLabel>Shop ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Shop ID</FormLabel><FormControl><Input {...field} disabled={user?.role === 'Agent'} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={editForm.control} name="clientName" render={({ field }) => (
-                        <FormItem><FormLabel>Client Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Client Name</FormLabel><FormControl><Input {...field} disabled={user?.role === 'Agent'} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={editForm.control} name="agent" render={({ field }) => (
                         <FormItem>
                         <FormLabel>Agent</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value} disabled={user?.role !== 'Admin' && user?.role !== 'Superadmin'}>
-                            <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                            <FormControl><SelectTrigger disabled={user?.role === 'Agent'}><SelectValue/></SelectTrigger></FormControl>
                             <SelectContent>{displayAgents.map(agent => <SelectItem key={agent.id} value={agent.name}>{agent.name}</SelectItem>)}</SelectContent>
                         </Select>
                         <FormMessage />
                         </FormItem>
                     )} />
                     <FormField control={editForm.control} name="kycCompletedDate" render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                        <FormLabel>KYC Completed Date</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>
+                        <FormItem className="flex flex-col"><FormLabel>KYC Completed Date</FormLabel>
+                        <Popover><PopoverTrigger asChild><FormControl>
+                            <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")} disabled={user?.role === 'Agent'}>
                                 {field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} />
-                          </PopoverContent>
+                            </Button>
+                        </FormControl></PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={user?.role === 'Agent'} /></PopoverContent>
                         </Popover><FormMessage /></FormItem>
                     )} />
                     <FormField control={editForm.control} name="status" render={({ field }) => (
                         <FormItem>
                         <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={user?.role === 'Agent'}>
+                            <FormControl><SelectTrigger disabled={user?.role === 'Agent'}><SelectValue /></SelectTrigger></FormControl>
                             <SelectContent>{clientStatus.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent>
                         </Select><FormMessage /></FormItem>
                     )} />
